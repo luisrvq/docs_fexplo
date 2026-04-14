@@ -1,9 +1,19 @@
-venv/
-__pycache__/
-*.pyc
-.env
-.ipynb_checkpoints/
+# Ignore everything in these folders
+app/
+data/
 storage/
-data/raw/
-data/*
-!data/.gitkeep
+chroma_db/
+__pycache__/
+
+# Ignore specific development/backup files
+main_*.py
+rag_pipeline_*.py
+test_*.py
+dryrun.py
+.env
+
+# Allow the main application files
+!mainf.py
+!rag_pipelinef.py
+!requirements.txt
+!.gitignore
