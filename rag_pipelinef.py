@@ -60,18 +60,27 @@ storage_context = StorageContext.from_defaults(vector_store=vector_store)
 # Build or load index
 # -----------------------------
 existing_chunks = collection.count()
+# Check if the data directory exists and has files
+data_exists = os.path.exists(DATA_PATH) and any(os.scandir(DATA_PATH))
 
 if existing_chunks == 0:
-    loader = SimpleDirectoryReader(input_dir=DATA_PATH)
-    docs = loader.load_data()
-    index = VectorStoreIndex.from_documents(
-        docs,
-        storage_context=storage_context,
-        show_progress=True,
-    )
+    if data_exists:
+        loader = SimpleDirectoryReader(input_dir=DATA_PATH)
+        docs = loader.load_data()
+        index = VectorStoreIndex.from_documents(
+            docs,
+            storage_context=storage_context,
+            show_progress=True,
+        )
+    else:
+        # Create an empty index if no files are found
+        # This allows the app to start so you can use the Upload button
+        index = VectorStoreIndex.from_documents(
+            [], 
+            storage_context=storage_context
+        )
 else:
     index = VectorStoreIndex.from_vector_store(vector_store)
-
 # -----------------------------
 # Memory
 # -----------------------------
