@@ -2,6 +2,8 @@ import streamlit as st
 ## from rag_pipelinef import ask, ingest_file, get_stats, reset_chat_memory
 import rag_pipelinef as rag  # Import as 'rag' to avoid name collisions
 import os
+from rag_pipelinef import reset_full_database
+
 
 def clear_all_filters():
     #1 Resetting the UI components
@@ -59,6 +61,21 @@ with st.sidebar:
                 st.rerun() # Refresh to update the metrics and file list
     else:
         st.info("No documents indexed.")
+    
+    ## Delete all the documents from the database
+    st.divider()
+    st.subheader("⚙️ System Maintenance")
+    
+    # Safety Checkbox to prevent accidental clicks
+    confirm_reset = st.checkbox("Confirm Total Reset")
+    
+    if st.button("Wipe All Data", type="primary", disabled=not confirm_reset):
+        with st.spinner("Deleting all chunks..."):
+            reset_full_database()
+            st.session_state.messages = [] # Clear chat
+            st.success("Database is now empty!")
+            st.rerun()
+
 
     st.sidebar.markdown( 
         "<h3 style='margin-bottom:5px;'>🔎 Keyword Filter</h3>",
