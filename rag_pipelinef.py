@@ -22,6 +22,7 @@ from llama_index.core.schema import QueryBundle
 from llama_index.postprocessor.rankgpt_rerank import RankGPTRerank
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.postprocessor import KeywordNodePostprocessor
+from llama_index.readers.file import DocxReader
 
 load_dotenv()
 
@@ -162,7 +163,11 @@ def ask(question: str, required_words: str = "", mode: str = "Match All", min_sc
 # Ingestion
 # -----------------------------
 def ingest_file(path: str):
-    loader = SimpleDirectoryReader(input_files=[path])
+    # This explicitly tells LlamaIndex how to handle Word files
+    docx_parser = DocxReader()
+    file_extractor = {".docx": docx_parser}
+    #loader = SimpleDirectoryReader(input_files=[path])
+    loader = SimpleDirectoryReader( input_files=[path], file_extractor=file_extractor ) 
     docs = loader.load_data()
     for d in docs:
         index.insert(d)
