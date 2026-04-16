@@ -2,7 +2,7 @@ import streamlit as st
 ## from rag_pipelinef import ask, ingest_file, get_stats, reset_chat_memory
 import rag_pipelinef as rag  # Import as 'rag' to avoid name collisions
 import os
-from rag_pipelinef import reset_full_database
+#from rag_pipelinef import reset_full_database
 
 
 def clear_all_filters():
@@ -71,7 +71,7 @@ with st.sidebar:
     
     if st.button("Wipe All Data", type="primary", disabled=not confirm_reset):
         with st.spinner("Deleting all chunks..."):
-            reset_full_database()
+            rag.reset_full_database()
             st.session_state.messages = [] # Clear chat
             st.success("Database is now empty!")
             st.rerun()
