@@ -59,28 +59,25 @@ storage_context = StorageContext.from_defaults(vector_store=vector_store)
 # -----------------------------
 # Build or load index
 # -----------------------------
+# Check what's actually in Chroma right now
 existing_chunks = collection.count()
 # Check if the data directory exists and has files
+# Check if there are any physical files in the data folder
+has_physical_files = any(os.scandir(DATA_PATH))
 data_exists = os.path.exists(DATA_PATH) and any(os.scandir(DATA_PATH))
 
 if existing_chunks == 0:
     if data_exists:
         loader = SimpleDirectoryReader(input_dir=DATA_PATH)
         docs = loader.load_data()
-        index = VectorStoreIndex.from_documents(
-            docs,
-            storage_context=storage_context,
-            show_progress=True,
-        )
+        index = VectorStoreIndex.from_documents(docs, storage_context=storage_context, show_progress=True, )
     else:
         # Create an empty index if no files are found
         # This allows the app to start so you can use the Upload button
-        index = VectorStoreIndex.from_documents(
-            [], 
-            storage_context=storage_context
-        )
+        index = VectorStoreIndex.from_documents( [], storage_context=storage_context   )
 else:
     index = VectorStoreIndex.from_vector_store(vector_store)
+
 # -----------------------------
 # Memory
 # -----------------------------
@@ -200,3 +197,25 @@ def delete_single_file(filename: str):
     # 3. Refresh the index to reflect the changes
     global index
     index = VectorStoreIndex.from_vector_store(vector_store)
+
+def reset_full_database():
+    # 1. Delete and recreate the collection in Chroma
+    client.delete_collection(COLLECTION_NAME)
+    
+    # 2. Re-initialize the globals
+    global collection, vector_store, storage_context, index
+    collection = client.get_or_create_collection(COLLECTION_NAME)
+    vector_store = ChromaVectorStore(chroma_collection=collection)
+    storage_context = StorageContext.from_defaults(vector_store=vector_store)
+    
+    # 3. Create a clean empty index
+    index = VectorStoreIndex.from_documents([], storage_context=storage_context)
+    
+    # 4. Clean local data folder
+    for f in os.listdir(DATA_PATH):
+        os.remove(os.path.join(DATA_PATH, f))
+
+# Check if we already have these files to avoid duplicates
+def is_file_indexed(filename):
+    results = collection.get(where={"file_name": filename})
+    return len(results['ids']) > 0
