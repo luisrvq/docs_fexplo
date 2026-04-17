@@ -35,24 +35,35 @@ st.markdown(
 )
 
 with st.sidebar:
-    st.markdown("### 📄 Document Management")  
-    uploaded = st.file_uploader( "Upload document", type=["pdf", "txt", "docx"], key=f"uploader_{st.session_state.upload_key}" )
-    if uploaded:
-        filename = uploaded.name
-        # 1️⃣ Check if file is already indexed
-        if rag.is_file_indexed(filename):
-            st.warning(f"'{filename}' Index Already exists")
+    st.markdown("### 📄 Document Management. Allow multiple files upload (Max. 15)")  
+    #uploaded = st.file_uploader( "Upload document", type=["pdf", "txt", "docx"], key=f"uploader_{st.session_state.upload_key}" )
+    uploaded_files = st.file_uploader( "Select one or several files ",
+    type=["pdf", "txt", "docx"],
+    accept_multiple_files=True,
+    key=f"folder_uploader_{st.session_state.upload_key}"
+)
+    if uploaded_files:
+        total = len(uploaded_files)
+        if total > 15:
+            st.error(f"You've selected {total} files. Max allowed is 15.")
         else:
-            # 2️⃣ Save the new file
-            path = os.path.join("data", uploaded.name)
-            with open(path, "wb") as f:
-                f.write(uploaded.getbuffer())
-            # 3️⃣ Indexation
-            with st.spinner("Indexing document..."):
-                rag.ingest_file(path)
-            st.success("Indexed!")
-        st.session_state.upload_key += 1
-        st.rerun()
+            for uploaded in uploaded_files:
+                filename = uploaded.name
+                # 1️⃣ Check if file is already indexed
+                if rag.is_file_indexed(filename):
+                    st.warning(f"'{filename}' Index Already exists")
+                    continue
+                # 2️⃣ Save the new file
+                path = os.path.join("data", uploaded.name)
+                with open(path, "wb") as f:
+                    f.write(uploaded.getbuffer())
+                # 3️⃣ Indexation
+                with st.spinner("Indexing document..."):
+                    rag.ingest_file(path)
+            st.success("Upload & Indexed completed!")
+            # Clen file
+            st.session_state.upload_key += 1
+            st.rerun()
     
     # Get list of files currently in the 'data' folder
     files = [f for f in os.listdir("data") if os.path.isfile(os.path.join("data", f))]

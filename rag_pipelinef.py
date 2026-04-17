@@ -64,7 +64,7 @@ storage_context = StorageContext.from_defaults(vector_store=vector_store)
 existing_chunks = collection.count()
 # Check if the data directory exists and has files
 # Check if there are any physical files in the data folder
-has_physical_files = any(os.scandir(DATA_PATH))
+##has_physical_files = any(os.scandir(DATA_PATH))
 data_exists = os.path.exists(DATA_PATH) and any(os.scandir(DATA_PATH))
 
 if existing_chunks == 0:
