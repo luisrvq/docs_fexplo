@@ -1,9 +1,14 @@
 import streamlit as st
-## from rag_pipelinef import ask, ingest_file, get_stats, reset_chat_memory
 import rag_pipelinef as rag  # Import as 'rag' to avoid name collisions
 import os
-#from rag_pipelinef import reset_full_database
 
+# Used to Clean upload file box
+if "upload_key" not in st.session_state:
+    st.session_state.upload_key = 0
+
+# Used to Clean the wipe all data box
+if "confirm_reset" not in st.session_state:
+    st.session_state.confirm_reset = False
 
 def clear_all_filters():
     #1 Resetting the UI components
@@ -15,7 +20,9 @@ def clear_all_filters():
     # 3. Reset the AI's memory in the backend
     rag.reset_chat_memory()
 
-
+# -----------------------------
+# Sidebar Options
+# -----------------------------
 
 st.markdown(
     """
@@ -27,55 +34,70 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# -----------------------------
-# Sidebar Options
-# -----------------------------
 with st.sidebar:
+    st.markdown("### 📄 Document Management")  
+    uploaded = st.file_uploader( "Upload document", type=["pdf", "txt", "docx"], key=f"uploader_{st.session_state.upload_key}" )
+    if uploaded:
+        filename = uploaded.name
+        # 1️⃣ Check if file is already indexed
+        if rag.is_file_indexed(filename):
+            st.warning(f"'{filename}' Index Already exists")
+        else:
+            # 2️⃣ Save the new file
+            path = os.path.join("data", uploaded.name)
+            with open(path, "wb") as f:
+                f.write(uploaded.getbuffer())
+            # 3️⃣ Indexation
+            with st.spinner("Indexing document..."):
+                rag.ingest_file(path)
+            st.success("Indexed!")
+        st.session_state.upload_key += 1
+        st.rerun()
+    
+    # Get list of files currently in the 'data' folder
+    files = [f for f in os.listdir("data") if os.path.isfile(os.path.join("data", f))]
+    if files:
+        selected_file = st.selectbox( "Select file to delete", ["-- Select a file --"] + files, index=0 )
+        if selected_file != "-- Select a file --":
+             if st.button(f"Delete {selected_file}", type="primary"):
+                  with st.spinner(f"Deleting {selected_file}..."):
+                    rag.delete_single_file(selected_file)
+                    st.success(f"Deleted {selected_file}!")
+                    st.rerun() # Refresh to update the metrics and file list
+    else:
+        st.info("No documents indexed.")
+
+    # Show status of documents and chunks
+    st.divider()  
     st.header("Knowledge Base")
     stats = rag.get_stats()
     col1, col2 = st.columns(2)
     col1.metric("Chunks", stats["chunks"])
     col2.metric("Docs", stats["documents"])
 
-    uploaded = st.file_uploader("Upload document", type=["pdf", "txt", "docx"])
-    if uploaded:
-        path = os.path.join("data", uploaded.name)
-        with open(path, "wb") as f:
-            f.write(uploaded.getbuffer())
-        rag.ingest_file(path)
-        st.success("Indexed!")
 
-    st.divider()
-    st.markdown("### 📄 Document Management")
-    
-    # Get list of files currently in the 'data' folder
-    files = [f for f in os.listdir("data") if os.path.isfile(os.path.join("data", f))]
-    
-    if files:
-        selected_file = st.selectbox("Select file to delete", files)
-        if st.button(f"Delete {selected_file}", type="primary"):
-            with st.spinner(f"Deleting {selected_file}..."):
-                from rag_pipelinef import delete_single_file
-                delete_single_file(selected_file)
-                st.success(f"Deleted {selected_file}!")
-                st.rerun() # Refresh to update the metrics and file list
-    else:
-        st.info("No documents indexed.")
-    
     ## Delete all the documents from the database
     st.divider()
     st.subheader("⚙️ System Maintenance")
     
     # Safety Checkbox to prevent accidental clicks
-    confirm_reset = st.checkbox("Confirm Total Reset")
-    
-    if st.button("Wipe All Data", type="primary", disabled=not confirm_reset):
+    if "confirm_reset" not in st.session_state:
+        st.session_state.confirm_reset = False
+    confirm_reset = st.checkbox( "Confirm Total Reset", value=st.session_state.confirm_reset )
+    # Atualiza o estado somente se o usuário clicar
+    st.session_state.confirm_reset = confirm_reset
+    files = [f for f in os.listdir("data") if os.path.isfile(os.path.join("data", f))]
+    # Desabilita botão se checkbox não marcado ou se não há arquivos
+    wipe_disabled = not st.session_state.confirm_reset or len(files) == 0
+   
+    if st.button("Wipe All Data", type="primary", disabled=wipe_disabled):
         with st.spinner("Deleting all chunks..."):
             rag.reset_full_database()
             st.session_state.messages = [] # Clear chat
+            # Resetar checkbox
+            st.session_state.confirm_reset = False
             st.success("Database is now empty!")
             st.rerun()
-
 
     st.sidebar.markdown( 
         "<h3 style='margin-bottom:5px;'>🔎 Keyword Filter</h3>",

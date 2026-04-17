@@ -186,6 +186,16 @@ def reset_chat_memory():
     # Make sure 'memory' matches the variable name 
     # you defined at the top of this file
     memory.reset() 
+
+# ----------------------------------
+# Persist function
+# ----------------------------------
+def force_persist():
+    try:
+        collection.persist()
+    except:
+        pass
+
 # ----------------------------------
 # ChromaDB Single deletion file
 # ----------------------------------
