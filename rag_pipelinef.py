@@ -24,6 +24,10 @@ from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.postprocessor import KeywordNodePostprocessor
 from llama_index.readers.file import DocxReader
 
+import base64
+from openai import OpenAI as OpenAIVision
+from llama_index.core import Document
+
 load_dotenv()
 
 class ManualNodeRetriever(BaseRetriever):
@@ -62,9 +66,7 @@ storage_context = StorageContext.from_defaults(vector_store=vector_store)
 # -----------------------------
 # Check what's actually in Chroma right now
 existing_chunks = collection.count()
-# Check if the data directory exists and has files
-# Check if there are any physical files in the data folder
-##has_physical_files = any(os.scandir(DATA_PATH))
+# Check if the data directory exists and has files in the data folder
 data_exists = os.path.exists(DATA_PATH) and any(os.scandir(DATA_PATH))
 
 if existing_chunks == 0:
@@ -86,6 +88,43 @@ memory = ChatMemoryBuffer.from_defaults(token_limit=3000)
 
 # Persist memory during the session
 chat_memory = ChatMemoryBuffer.from_defaults(token_limit=3000)
+
+# ------------------------------------
+# Extract text from images  2026-04-18
+# ------------------------------------
+def extract_text_from_image(image_path: str) -> str:
+    client = OpenAIVision()
+
+    with open(image_path, "rb") as img_file:
+        b64_image = base64.b64encode(img_file.read()).decode("utf-8")
+    # Convert to data URL (THIS is the fix)
+    image_data_url = f"data:image/png;base64,{b64_image}"
+    response = client.responses.create(
+        model="gpt-4.1-mini",
+        input=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": """Extract all useful information from this image.
+- Include visible text (OCR)
+- Describe charts, diagrams, or layouts
+- Identify key entities, labels, and numbers
+- Summarize the content clearly and concisely
+"""
+                    },
+                    {
+                        "type": "input_image",
+                        "image_url": image_data_url
+                    }
+                ]
+            }
+        ]
+    )
+
+    return response.output_text
+
 # -----------------------------
 # Query function ASK function
 # -----------------------------
@@ -160,7 +199,7 @@ def ask(question: str, required_words: str = "", mode: str = "Match All", min_sc
 
 
 # -----------------------------
-# Ingestion
+# Ingest document files
 # -----------------------------
 def ingest_file(path: str):
     # This explicitly tells LlamaIndex how to handle Word files
@@ -171,6 +210,22 @@ def ingest_file(path: str):
     docs = loader.load_data()
     for d in docs:
         index.insert(d)
+
+# -----------------------------
+# Ingest images  2026-04-18
+# -----------------------------
+def ingest_image(path: str):
+    text = extract_text_from_image(path)
+
+    doc = Document(
+        text=text,
+        metadata={
+            "file_name": os.path.basename(path),
+            "type": "image"
+        }
+    )
+
+    index.insert(doc)
 
 # -----------------------------
 # Stats
