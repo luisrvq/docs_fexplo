@@ -4,6 +4,7 @@ data/
 storage/
 chroma_db/
 __pycache__/
+*.log
 
 # Ignore specific development/backup files
 main_*.py
