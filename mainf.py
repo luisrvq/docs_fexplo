@@ -12,6 +12,24 @@ if "upload_key" not in st.session_state:
 if "confirm_reset" not in st.session_state:
     st.session_state.confirm_reset = False
 
+# Check if the app is running on the web
+IS_CLOUD = os.getenv("STREAMLIT_SERVER_HEADLESS") == "true"
+
+def render_file_action(file_name: str, full_path: str, key: str):
+    if IS_CLOUD:
+        # 🌐 Web behavior
+        st.caption(f"📄 {file_name}")
+
+        try:
+            with open(full_path, "rb") as f:
+                st.download_button( label="⬇️ Download", data=f, file_name=file_name, key=f"dl_{key}" )
+        except:
+            st.caption("File not available")
+    else:
+        # 💻 Local behavior
+        if st.button("📁 Open Folder", key=f"btn_{key}"):
+            reveal_in_explorer(full_path)
+
 def clear_all_filters():
     #1 Resetting the UI components
     st.session_state["keyword_filter_key"] = ""
@@ -32,23 +50,24 @@ def reveal_in_explorer(file_path):
         subprocess.run(["open", "-R", file_path])
     else: # Linux
         subprocess.run(["xdg-open", os.path.dirname(file_path)])
+
 # -----------------------------
 # Sidebar Options
 # -----------------------------
 
 st.markdown(
     """
-    <h1 style='font-size:32px;'>AI RAG Assistant</h1>
+    <h1 style='font-size:32px;'>AI RAG Personal Assistant</h1>
     <p style='font-size:18px; color:gray;'>
-        Find insights across your documents using AI
+        Find information across your documents using AI
     </p>
     """,
     unsafe_allow_html=True
 )
-
+## Upload files section
 with st.sidebar:
-    st.markdown("### 📄 Document Management. Allow multiple files upload (Max. 15)")  
-    uploaded_files = st.file_uploader( "Select one or several files ",
+    st.markdown("### 📄 Document Management")  
+    uploaded_files = st.file_uploader( "Select one or several files (Max. 15) ",
     type=["pdf", "txt", "docx", "png", "jpg", "jpeg"],
     accept_multiple_files=True,
     key=f"folder_uploader_{st.session_state.upload_key}"
@@ -85,27 +104,65 @@ with st.sidebar:
             # Clean file
             st.session_state.upload_key += 1
             st.rerun()
-    
+    ## ----------------------
+    ## Delete files section  
+    ## ----------------------  
     # Get list of files currently in the 'data' folder
-    files = [f for f in os.listdir("data") if os.path.isfile(os.path.join("data", f))]
-    if files:
-        selected_file = st.selectbox( "Select file to delete", ["-- Select a file --"] + files, index=0 )
-        if selected_file != "-- Select a file --":
-             if st.button(f"Delete {selected_file}", type="primary"):
-                  with st.spinner(f"Deleting {selected_file}..."):
-                    rag.delete_single_file(selected_file)
-                    st.success(f"Deleted {selected_file}!")
-                    st.rerun() # Refresh to update the metrics and file list
-    else:
-        st.info("No documents indexed.")
+    if "show_delete_panel" not in st.session_state:  # Init state
+        st.session_state.show_delete_panel = False
+    
+    if "pending_delete" not in st.session_state:     # Init state
+        st.session_state.pending_delete = None
+    
+    # 🔘 Show ONLY when panel is closed
+    if not st.session_state.show_delete_panel:
+        if st.button("🗑️ Delete a file", key="open_delete_panel"):
+            st.session_state.show_delete_panel = True
 
-    # Show status of documents and chunks
+    # 📂 Delete panel
+    if st.session_state.show_delete_panel:
+         # 🔝 Top close button
+        if st.button("❌ Close Delete Panel", key="close_top"):
+            st.session_state.show_delete_panel = False
+            st.rerun()
+
+        st.markdown("### 📂 Select a file to delete") 
+        files = [f for f in os.listdir("data") if os.path.isfile(os.path.join("data", f))]
+        if files:
+            for i, file in enumerate(files):
+                file_path = os.path.join("data", file)
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    st.markdown(f"📄 **{file}**")
+                with col2:
+                    if st.button("Delete", key=f"delete_{i}"):
+                        st.session_state["pending_delete"] = file
+        else:
+            st.info("No documents available.")
+    
+        if st.button("❌ Close Delete Panel", key="close_bottom"):  
+            st.session_state.show_delete_panel = False
+            st.rerun()
+    
+    # ⚠️ Confirmation
+    if st.session_state.pending_delete:
+        file = st.session_state.pending_delete
+        st.warning(f"⚠️ Delete **{file}**?")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ Confirm", key="confirm_delete"):
+                rag.delete_single_file(file)
+                st.success("Deleted!")
+                st.session_state.pending_delete = None
+                st.rerun()
+        with col2:
+            if st.button("❌ Cancel", key="cancel_delete"):
+                st.session_state.pending_delete = None   
+    ## ----------------------   
+    
+    ## Show status of documents and chunks
     st.divider()  
-    #st.header("Knowledge Base")
     stats = rag.get_stats()
-    #col1, col2 = st.columns(2)
-    #col1.metric("Blocks", stats["chunks"], help="Blocks are bite-sized pieces of your documents created so the AI can find and read relevant information faster.")
-    #col2.metric("Docs", stats["documents"])
     st.markdown(
         f"""
         <div style="margin-bottom: 10px;">
@@ -165,14 +222,34 @@ with st.sidebar:
     # THE CLEAR BUTTON: It calls our reset function when clicked
     st.button("Clear All Filters", on_click=clear_all_filters, use_container_width=True)
 # -----------------------------
-# Chat interaction
+# Chat messages
 # -----------------------------
 if "messages" not in st.session_state:    # 1️⃣ Initialize messages
     st.session_state.messages = []
 
-for m in st.session_state.messages:       # 2️⃣ Render chat history (user + assistant messages)
+for i, m in enumerate(st.session_state.messages):
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
+
+        # Only assistant messages have sources
+        if m["role"] == "assistant" and "sources" in m:
+
+            with st.expander("Sources & Evidence", expanded=False):
+                for j, item in enumerate(m["snippets"]):
+
+                    # Preview
+                    if item["file"].endswith((".png", ".jpg", ".jpeg")):
+                        st.image(f"data/{item['file']}", width=200)
+                    else:
+                        st.caption(f"Source: {item['file']} | Score: {item['score']}")
+                        st.info(item["snippet"])
+
+                    full_path = os.path.abspath(f"data/{item['file']}")
+
+                    # Unique key per message + item
+                    render_file_action( file_name=item["file"], full_path=full_path, key=f"{i}_{j}" )
+
+                    st.divider()
 for key in st.session_state:              # 3️⃣ 🔁 Re-render stored results
     if key.startswith("result_"):
         data = st.session_state[key]
@@ -182,7 +259,7 @@ for key in st.session_state:              # 3️⃣ 🔁 Re-render stored result
 
             if data["sources"]:
                 with st.expander("Sources & Evidence", expanded=True):
-                    for item in data["snippets"]:
+                    for i, item in enumerate (data["snippets"]):
 
                         # Preview
                         if item["file"].endswith((".png", ".jpg", ".jpeg")):
@@ -194,11 +271,7 @@ for key in st.session_state:              # 3️⃣ 🔁 Re-render stored result
                         # Button
                         full_path = os.path.abspath(f"data/{item['file']}")
 
-                        if st.button(
-                            f"📁 Open Folder",
-                            key=f"btn_{key}_{item['file']}"
-                        ):
-                            reveal_in_explorer(full_path)
+                        render_file_action( file_name=item["file"], full_path=full_path, key=f"{i}_{j}" )
 
                         st.divider()
 
@@ -209,22 +282,29 @@ if prompt := st.chat_input("Ask something about your documents"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        # 1. Create a unique key for this specific interaction's results We use the prompt hash or a counter to keep it unique
-        result_key = f"result_{hash(prompt)}"
-        if result_key not in st.session_state:
-            with st.spinner("Thinking..."):
-                answer, sources, snippets = rag.ask(prompt, required_words=keywordsx, mode=match_mode, min_score=min_score)
-                # Store everything in session state so it survives the rerun
-                st.session_state[result_key] = { "answer": answer, "sources": sources, "snippets": snippets  }
+        with st.spinner("Thinking..."):
+            # NEW: build context-aware prompt
+            if "last_source" in st.session_state:
+                enhanced_prompt = f"""
+                    Focus ONLY on the document: {st.session_state['last_source']}
+
+                    User question:
+                    {prompt}
+                    """
+            else:
+                enhanced_prompt = prompt
+
+            answer, sources, snippets = rag.ask( enhanced_prompt, required_words=keywordsx, mode=match_mode, min_score=min_score )
+
+            if sources:
+                st.session_state["last_source"] = sources[0][0]  # NEW: store top document
+
+            st.markdown(answer)
         # 2. Retrieve the data from session state
-        data = st.session_state[result_key]
-        #st.markdown(answer)
-        st.markdown(data["answer"])
         # Show sources + snippets
-        if data["sources"]:
+        if sources:
              with st.expander("Sources & Evidence"):
-                  #for item in snippets:
-                  for item in data["snippets"]:
+                  for j, item in enumerate(snippets):
                         # 1. First, show the preview (Image or Text)
                         if item["file"].endswith((".png", ".jpg", ".jpeg")):
                             st.image(f"data/{item['file']}", width=200)
@@ -235,8 +315,8 @@ if prompt := st.chat_input("Ask something about your documents"):
                         # We assume your files are in the 'data/' folder relative to your app
                         full_path = os.path.abspath(f"data/{item['file']}") 
                     
-                        if st.button(f"📁 Open Folder", key=f"btn_{item['file']}_{item['score']}"):
-                            reveal_in_explorer(full_path)
+                        render_file_action( file_name=item["file"], full_path=full_path, key=f"new_{j}" )
                     
                         st.divider() # Optional: adds a small line between different sources
-    st.session_state.messages.append({"role": "assistant", "content": answer})
+    ##st.session_state.messages.append({"role": "assistant", "content": answer})
+    st.session_state.messages.append({ "role": "assistant", "content": answer, "sources": sources, "snippets": snippets })
