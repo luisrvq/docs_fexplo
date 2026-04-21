@@ -132,12 +132,22 @@ def ask(question: str, required_words: str = "", mode: str = "Match All", min_sc
     # 1. Retrieve a generous pool
     retriever = index.as_retriever(similarity_top_k=20)
     initial_nodes = retriever.retrieve(question)
+    filtered_by_score = [ nws for nws in initial_nodes if getattr(nws, "score", 0) >= min_score ]
+
+    # Capture similarity scores early
+    similarity_map = {}
+    for nws in initial_nodes:
+        fname = nws.node.metadata.get("file_name", "Unknown")
+        similarity_map[fname] = max( similarity_map.get(fname, 0), getattr(nws, "score", 0) )
+
+    # Step 2 — Apply similarity filter first
+    nodes_after_score = [ nws for nws in initial_nodes if getattr(nws, "score", 0) >= min_score ]
 
     # 2. Manual Keyword Filtering Logic
     if required_words:
         keywords_split  = [k.strip().lower() for k in required_words.split(",") if k.strip()]
         filtered_nodes = []
-        for node_with_score in initial_nodes:
+        for node_with_score in nodes_after_score:
             content = node_with_score.node.get_content().lower()
             
             if mode == "Match All":
@@ -151,12 +161,14 @@ def ask(question: str, required_words: str = "", mode: str = "Match All", min_sc
         
         nodes_to_rerank = filtered_nodes
     else:    
-        nodes_to_rerank = initial_nodes
+        nodes_to_rerank = nodes_after_score
 
     # SAFETY CHECK: If no nodes survived filtering, return early
     if not nodes_to_rerank:
-        return "I found documents matching your vector search, but none contained the required keywords. Try changing 'Match All' to 'Match Any'.", [], []
-
+        return (
+        "No documents passed the similarity threshold or keyword filters. "
+        "Try lowering the minimum similarity score or adjusting keywords.", [], [] )
+    
     # 3. Rerank the remaining nodes
     llm = OpenAI(model="gpt-4o-mini")
     reranker = RankGPTRerank(llm=llm, top_n=3)
@@ -169,8 +181,7 @@ def ask(question: str, required_words: str = "", mode: str = "Match All", min_sc
     chat_engine = ContextChatEngine.from_defaults(
         retriever=custom_retriever, # This is required by the constructor
         memory=memory,       # Uses your 'memory' variable defined at the top of your file
-        system_prompt="You are a helpful assistant. Use the provided context to answer questions."
-    )
+        system_prompt="You are a helpful assistant. Use the provided context to answer questions." )
 
     # 5. Execute the chat normally (no 'nodes' argument needed now)
     response = chat_engine.chat(question)
@@ -193,10 +204,12 @@ def ask(question: str, required_words: str = "", mode: str = "Match All", min_sc
             seen.add(fname)
 
         snippet = node.get_content()[:250].replace("\n", " ").strip()
-        snippets.append({"file": fname, "snippet": snippet, "score": round(score, 3)})
-
+        ##snippets.append({"file": fname, "snippet": snippet, "score": round(score, 3)})
+        snippets.append({ "file": fname,
+                          "relevance_score": score,                       # reranker
+                          "similarity_score": similarity_map.get(fname, 0),  # retriever
+                          "snippet": snippet })
     return response.response, ranked_sources, snippets
-
 
 # -----------------------------
 # Ingest document files

@@ -188,7 +188,7 @@ with st.sidebar:
     st.sidebar.markdown( 
         "<h3 style='margin-bottom:5px;'>🔎 Keyword Filter</h3>",
         unsafe_allow_html=True  )
-    keywordsx = st.sidebar.text_input( "Keyword Filter", placeholder="e.g. EnterpriseOne, AI...", key="keyword_filter_key", label_visibility="collapsed" )
+    keywordsx = st.sidebar.text_input( "Keyword Filter", placeholder="e.g. Oracle, SAP, AI...", key="keyword_filter_key", label_visibility="collapsed" )
     match_mode = st.sidebar.radio( "Keyword Logic",
         options=["Match All", "Match Any"], key="logic_mode_key",
         help="'Match All' is stricter. 'Match Any' returns results containing at least one term." )
@@ -243,7 +243,10 @@ for i, m in enumerate(st.session_state.messages):
                     if item["file"].endswith((".png", ".jpg", ".jpeg")):
                         st.image(f"data/{item['file']}", width=200)
                     else:
-                        st.caption(f"Source: {item['file']} | Score: {item['score']}")
+                        ##st.caption(f"Source: {item['file']} | Score: {item['score']}")
+                        st.caption( f"📄 {item['file']} | "
+                                    f"Similarity: {item.get('similarity_score', 0):.2f} | "
+                                    f"Relevance: {item.get('relevance_score', 0):.2f}" )
                         st.info(item["snippet"])
 
                     full_path = os.path.abspath(f"data/{item['file']}")
@@ -267,7 +270,10 @@ for key in st.session_state:              # 3️⃣ 🔁 Re-render stored result
                         if item["file"].endswith((".png", ".jpg", ".jpeg")):
                             st.image(f"data/{item['file']}", width=200)
                         else:
-                            st.caption(f"Source: {item['file']} | Score: {item['score']}")
+                            ##st.caption(f"Source: {item['file']} | Score: {item['score']}")
+                            st.caption( f"📄 {item['file']} | "
+                                        f"Similarity: {item.get('similarity_score', 0):.2f} | "
+                                        f"Relevance: {item.get('relevance_score', 0):.2f}"  )
                             st.info(item["snippet"])
 
                         # Button
@@ -311,7 +317,9 @@ if prompt := st.chat_input("Ask something about your documents"):
                         if item["file"].endswith((".png", ".jpg", ".jpeg")):
                             st.image(f"data/{item['file']}", width=200)
                         else:
-                            st.caption(f"Source: {item['file']} | Relevance Score: {item['score']}")
+                            st.caption( f"📄 {item['file']} | " 
+                                        f"Similarity: {item.get('similarity_score', 0):.2f} | "
+                                        f"Relevance: {item.get('relevance_score', 0):.2f}" )
                             st.info(item["snippet"])
                         # 2. Add the "Show in Folder" button right below the preview
                         # We assume your files are in the 'data/' folder relative to your app
