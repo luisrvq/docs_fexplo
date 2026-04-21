@@ -13,7 +13,8 @@ if "confirm_reset" not in st.session_state:
     st.session_state.confirm_reset = False
 
 # Check if the app is running on the web
-IS_CLOUD = os.getenv("STREAMLIT_SERVER_HEADLESS") == "true"
+## IS_CLOUD = os.getenv("STREAMLIT_SERVER_HEADLESS") == "true"
+IS_CLOUD = not os.path.exists("C:/")
 
 def render_file_action(file_name: str, full_path: str, key: str):
     if IS_CLOUD:
