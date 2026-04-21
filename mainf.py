@@ -55,12 +55,12 @@ def reveal_in_explorer(file_path):
 # -----------------------------
 # Sidebar Options
 # -----------------------------
-
+## Title of Chat pannel
 st.markdown(
     """
     <h1 style='font-size:32px;'>AI RAG Personal Assistant</h1>
     <p style='font-size:18px; color:gray;'>
-        Find information across your documents using AI
+        Find information across your documents using AI 
     </p>
     """,
     unsafe_allow_html=True
@@ -71,8 +71,7 @@ with st.sidebar:
     uploaded_files = st.file_uploader( "Select one or several files (Max. 15) ",
     type=["pdf", "txt", "docx", "png", "jpg", "jpeg"],
     accept_multiple_files=True,
-    key=f"folder_uploader_{st.session_state.upload_key}"
-)
+    key=f"folder_uploader_{st.session_state.upload_key}" )
     if uploaded_files:
         total = len(uploaded_files)
         if total > 15:
@@ -161,7 +160,7 @@ with st.sidebar:
                 st.session_state.pending_delete = None   
     ## ----------------------   
     
-    ## Show status of documents and chunks
+    ## Show statistics of # of documents and chunks
     st.divider()  
     stats = rag.get_stats()
     st.markdown(
@@ -183,8 +182,23 @@ with st.sidebar:
             </div>
         </div>
         """,
-        unsafe_allow_html=True
-    )
+        unsafe_allow_html=True  )
+
+    ## Filters
+    st.sidebar.markdown( 
+        "<h3 style='margin-bottom:5px;'>🔎 Keyword Filter</h3>",
+        unsafe_allow_html=True  )
+    keywordsx = st.sidebar.text_input( "Keyword Filter", placeholder="e.g. EnterpriseOne, AI...", key="keyword_filter_key", label_visibility="collapsed" )
+    match_mode = st.sidebar.radio( "Keyword Logic",
+        options=["Match All", "Match Any"], key="logic_mode_key",
+        help="'Match All' is stricter. 'Match Any' returns results containing at least one term." )
+    
+    ## Retrieval settings
+    st.sidebar.header("🔍 Retrieval Settings")
+    min_score = st.sidebar.slider( "Minimum similarity score", min_value=0.0,  max_value=1.0, value=0.2, step=0.01, key="min_score_key" )
+
+    # THE CLEAR BUTTON: It calls our reset function when clicked
+    st.button("Clear All Filters", on_click=clear_all_filters, use_container_width=True)
 
     ## Delete all the documents from the database
     st.divider()
@@ -208,20 +222,7 @@ with st.sidebar:
             st.session_state.confirm_reset = False
             st.success("Database is now empty!")
             st.rerun()
-
-    st.sidebar.markdown( 
-        "<h3 style='margin-bottom:5px;'>🔎 Keyword Filter</h3>",
-        unsafe_allow_html=True  )
-    keywordsx = st.sidebar.text_input( "Keyword Filter", placeholder="e.g. EnterpriseOne, AI...", key="keyword_filter_key", label_visibility="collapsed" )
-    match_mode = st.sidebar.radio( "Keyword Logic",
-        options=["Match All", "Match Any"], key="logic_mode_key",
-        help="'Match All' is stricter. 'Match Any' returns results containing at least one term." )
-
-    st.sidebar.header("🔍 Retrieval Settings")
-    min_score = st.sidebar.slider( "Minimum similarity score", min_value=0.0,  max_value=1.0, value=0.2, step=0.01, key="min_score_key" )
-
-    # THE CLEAR BUTTON: It calls our reset function when clicked
-    st.button("Clear All Filters", on_click=clear_all_filters, use_container_width=True)
+    
 # -----------------------------
 # Chat messages
 # -----------------------------
