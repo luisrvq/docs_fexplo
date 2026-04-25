@@ -147,6 +147,15 @@ OPENAI_API_KEY = "your_api_key_here"
 * 🧹 Bulk document management
 
 ---
+## 📸 Screenshots
+
+### Sidebar & Controls
+![Sidebar](assets/sidebar.png)
+
+### Chat & Sources
+![Chat](assets/chat.png)
+
+---
 
 ## 👤 Author
 
