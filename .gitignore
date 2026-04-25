@@ -4,14 +4,14 @@ data/
 storage/
 chroma_db/
 __pycache__/
+*.pyc
 *.log
 
 # Ignore specific development/backup files
-main_*.py
-rag_pipeline_*.py
 test_*.py
 dryrun.py
 .env
+venv/
 
 # Allow the main application files
 !mainf.py
