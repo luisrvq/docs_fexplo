@@ -89,10 +89,14 @@ st.markdown(
 with st.sidebar:
     st.sidebar.header("🔍 Session options")
     ## Session link
-    base_url = st.get_option("browser.serverAddress") or ""
+    base_url = st.get_option("browser.serverAddress")
+    if not base_url:  # Fallback for local
+        base_url = "http://localhost:8501"
     session_link = f"?session_id={st.session_state.session_id}"
-    st.sidebar.markdown("#### 🔗 Share or Save Your Session")
-    st.sidebar.code(session_link)
+    full_link = f"{base_url}/?session_id={st.session_state.session_id}"
+    st.sidebar.markdown("##### 🔗 Share or Save Your Session")
+    st.sidebar.code(full_link, language=None)
+    st.sidebar.caption("💡 Bookmark or share this link to return to your session")
 
     ## Reset session buttonn
     #st.sidebar.markdown("---")
@@ -171,11 +175,11 @@ with st.sidebar:
         if files:
             for i, file in enumerate(files):
                 file_path = os.path.join(user_data_path, file)
-                col1, col2 = st.columns([4, 1])
+                col1, col2 = st.columns([6, 1])
                 with col1:
                     st.markdown(f"📄 **{file}**")
                 with col2:
-                    if st.button("Delete", key=f"delete_{i}"):
+                    if st.button("🗑️", key=f"delete_{i}", help='Delete file'):
                         st.session_state["pending_delete"] = file
         else:
             st.info("No documents available.")
