@@ -88,15 +88,19 @@ st.markdown(
 # -----------------------------
 with st.sidebar:
     st.sidebar.header("🔍 Session options")
-    ## Session link
-    base_url = st.get_option("browser.serverAddress")
-    if not base_url:  # Fallback for local
-        base_url = "http://localhost:8501"
-    session_link = f"?session_id={st.session_state.session_id}"
-    full_link = f"{base_url}/?session_id={st.session_state.session_id}"
     st.sidebar.markdown("##### 🔗 Share or Save Your Session")
-    st.sidebar.code(full_link, language=None)
-    st.sidebar.caption("💡 Bookmark or share this link to return to your session")
+    # ✅ Get current query params safely
+    query_params = st.query_params
+    # Build full URL (works in cloud + local)
+    session_id = st.session_state.session_id
+    full_link = f"?session_id={session_id}"
+    # Clickable link
+    st.markdown(
+        f'<a href="{full_link}" target="_blank">🔗 Open your session</a>',
+        unsafe_allow_html=True  )
+    # Show link for copy
+    st.code(full_link)
+    st.caption("💡 Copy and bookmark this link")
 
     ## Reset session buttonn
     #st.sidebar.markdown("---")
