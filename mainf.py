@@ -88,19 +88,15 @@ st.markdown(
 # -----------------------------
 with st.sidebar:
     st.sidebar.header("🔍 Session options")
-    st.sidebar.markdown("##### 🔗 Share or Save Your Session")
-    # ✅ Get current query params safely
-    query_params = st.query_params
-    # Build full URL (works in cloud + local)
+    st.sidebar.markdown("##### Your Session id")
     session_id = st.session_state.session_id
-    full_link = f"?session_id={session_id}"
-    # Clickable link
-    st.markdown(
-        f'<a href="{full_link}" target="_blank">🔗 Open your session</a>',
-        unsafe_allow_html=True  )
-    # Show link for copy
-    st.code(full_link)
-    st.caption("💡 Copy and bookmark this link")
+    # Full link (relative, but resolves to full URL in browser)
+    full_link = f"{st.query_params.get('base_url', '')}?session_id={session_id}"
+    # Fallback: just use query string (browser completes it)
+    if not full_link.startswith("http"):
+        full_link = f"?session_id={session_id}"
+    st.sidebar.text_input("Copy full session link", full_link)
+    st.sidebar.caption("💡 Bookmark or share this link to return later")
 
     ## Reset session buttonn
     #st.sidebar.markdown("---")
@@ -262,7 +258,7 @@ with st.sidebar:
     # Desabilita botão se checkbox não marcado ou se não há arquivos
     wipe_disabled = not st.session_state.confirm_reset or len(files) == 0
    
-    if st.button("Wipe All Data", type="primary", disabled=wipe_disabled):
+    if st.button("🧹 Wipe Current Session Data", type="primary", disabled=wipe_disabled):
         with st.spinner("Deleting all chunks..."):
             rag.reset_full_database(st.session_state.session_id)
             st.session_state.messages = [] # Clear chat
