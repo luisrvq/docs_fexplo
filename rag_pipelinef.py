@@ -1,4 +1,5 @@
 import os
+import shutil
 from urllib import response
 from dotenv import load_dotenv
 import chromadb
@@ -281,7 +282,10 @@ def delete_single_file(filename: str):
     global index
     index = VectorStoreIndex.from_vector_store(vector_store)
 
-def reset_full_database():
+# -----------------------------------------
+# ChromaDB wipe all data of current session
+# ----------------------------------------
+def reset_full_database(session_id):
     # 1. Delete and recreate the collection in Chroma
     client.delete_collection(COLLECTION_NAME)
     
@@ -294,9 +298,10 @@ def reset_full_database():
     # 3. Create a clean empty index
     index = VectorStoreIndex.from_documents([], storage_context=storage_context)
     
-    # 4. Clean local data folder
-    for f in os.listdir(DATA_PATH):
-        os.remove(os.path.join(DATA_PATH, f))
+    # 4. Clean session data folder
+    session_path = os.path.join("data", session_id)
+    if os.path.exists(session_path):
+        shutil.rmtree(session_path)  # 🔥 deletes folder + contents
 
 # Check if we already have these files to avoid duplicates
 def is_file_indexed(filename):

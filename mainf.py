@@ -264,7 +264,7 @@ with st.sidebar:
    
     if st.button("Wipe All Data", type="primary", disabled=wipe_disabled):
         with st.spinner("Deleting all chunks..."):
-            rag.reset_full_database()
+            rag.reset_full_database(st.session_state.session_id)
             st.session_state.messages = [] # Clear chat
             # Resetar checkbox
             st.session_state.confirm_reset = False
