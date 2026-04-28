@@ -11,14 +11,16 @@ import urllib.parse
 # First visit → create session_id → store in URL  
 # Refresh → read from URL → reuse 
 # ----------------------------------------------
+
 query_params = st.query_params
 if "session_id" in query_params:
-    st.session_state.session_id = query_params["session_id"]
+    session_id = query_params["session_id"]
+    st.session_state.session_id = session_id
 else:
-    new_id = str(uuid.uuid4())[:8]
-    st.session_state.session_id = new_id
-    st.query_params["session_id"] = new_id
-print(f"Current session_id: {st.session_state.session_id}")
+    session_id = str(uuid.uuid4())[:8]
+    st.session_state.session_id = session_id
+    st.query_params["session_id"] = session_id
+print(f"Current session_id from Query Param: {session_id}")
 
 user_data_path = f"data/{st.session_state.session_id}"
 os.makedirs(user_data_path, exist_ok=True)
@@ -31,10 +33,15 @@ if "upload_key" not in st.session_state:
 if "confirm_reset" not in st.session_state:
     st.session_state.confirm_reset = False
 
-# Check if the app is running on the web
-## IS_CLOUD = os.getenv("STREAMLIT_SERVER_HEADLESS") == "true"
-IS_CLOUD = not os.path.exists("C:/")
+# Create data paths
+data_path = f"data/{st.session_state.session_id}"
+db_path = f"storage/{st.session_state.session_id}"
+collection_name = f"documents_{st.session_state.session_id}"
+rag.initialize_paths(data_path, db_path, collection_name)
 
+
+# Check if the app is running on the web
+IS_CLOUD = not os.path.exists("C:/")
 def render_file_action(file_name: str, full_path: str, key: str):
     if IS_CLOUD:
         # 🌐 Web behavior
@@ -87,24 +94,52 @@ st.markdown(
 # Sidebar Options
 # -----------------------------
 with st.sidebar:
-    st.sidebar.header("🔍 Session options")
-    st.sidebar.markdown("##### Your Session id")
+    st.header("🔍 Session options")
     session_id = st.session_state.session_id
-    # Full link (relative, but resolves to full URL in browser)
-    full_link = f"{st.query_params.get('base_url', '')}?session_id={session_id}"
-    # Fallback: just use query string (browser completes it)
-    if not full_link.startswith("http"):
-        full_link = f"?session_id={session_id}"
-    st.sidebar.text_input("Copy full session link", full_link)
-    st.sidebar.caption("💡 Bookmark or share this link to return later")
+    st.markdown(
+        f"""
+        <div style="display: flex; justify-content: space-between; background-color: rgba(255, 255, 255, 0.05); 
+            padding: 10px; border-radius: 8px; border: 1px solid rgba(151, 151, 151, 0.2);">
+            <div style="text-align: left; flex: 1;">
+                <span style="font-size: 18px; font-weight: bold;">Current session_id: {session_id} </span>
+            </div>            
+        """,
+        unsafe_allow_html=True  ) 
+
+    ## Switch session
+    st.sidebar.markdown("### 🔄 Switch Session")
+    # Create 3 columns: input | open | cancel
+    col1, col2, col3 = st.sidebar.columns([4, 1, 1])
+    with col1:
+        new_session_id = st.text_input(
+            "Enter session ID",
+            placeholder="e.g. ab12cd34",
+            label_visibility="collapsed" ) # 🔥 removes extra label spac
+    with col2:
+        open_clicked = st.button("➡️", help="Open session")
+    with col3:
+        cancel_clicked = st.button("❌", help="Cancel")
+    # Handle actions
+    if open_clicked:
+        if new_session_id:
+            st.query_params["session_id"] = new_session_id
+            st.session_state.session_id = new_session_id
+            st.session_state.switch_session_input = ""
+            st.rerun()
+        else:
+            st.warning("Enter a session ID")
+
+    if cancel_clicked:
+        st.session_state.switch_session_input = ""
+        st.rerun()
 
     ## Reset session buttonn
     #st.sidebar.markdown("---")
     if st.sidebar.button("🔄 Start New Session"):
         new_id = str(uuid.uuid4())[:8]
+        st.session_state.clear()   # Optional: clear chat memory
         st.query_params["session_id"] = new_id
-        # Optional: clear chat memory
-        st.session_state.clear()
+        st.session_state.session_id = new_id
         st.rerun()
 
     ## Upload files section

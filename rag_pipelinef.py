@@ -4,11 +4,7 @@ from urllib import response
 from dotenv import load_dotenv
 import chromadb
 
-from llama_index.core import (
-    VectorStoreIndex,
-    SimpleDirectoryReader,
-    StorageContext,
-    Settings, )
+from llama_index.core import ( VectorStoreIndex,   SimpleDirectoryReader,  StorageContext,  Settings, )
 
 from llama_index.core import query_engine
 from llama_index.vector_stores.chroma import ChromaVectorStore
@@ -40,47 +36,48 @@ class ManualNodeRetriever(BaseRetriever):
         return self._nodes
 
 Settings.llm = OpenAI(model="gpt-4o-mini")
-Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
-
+Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")        
 
 # -----------------------------
-# Paths
+# Paths & Collections
 # -----------------------------
-DATA_PATH = "data"
-DB_PATH = "storage/chroma_db_fresh"
-COLLECTION_NAME = "documents_fresh"
+## import mainf as mnf  # Import as 'mnf' to avoid name collisions
+## data_path, db_path, collection_name = mnf.create_paths_in_main
+## data_path = f"data/{st.session_state.session_id}"
+## db_path = f"storage/{session_id}"
+## collection_name = f"documents_{session_id}"
 
-os.makedirs(DATA_PATH, exist_ok=True)
-os.makedirs(DB_PATH, exist_ok=True)
+
+###os.makedirs(data_path, exist_ok=True)
+###os.makedirs(db_path, exist_ok=True)
 
 # -----------------------------
 # Chroma setup
 # -----------------------------
-client = chromadb.PersistentClient(path=DB_PATH)
-collection = client.get_or_create_collection(COLLECTION_NAME)
+###client = chromadb.PersistentClient(path=db_path)
+###collection = client.get_or_create_collection(collection_name)
 
-vector_store = ChromaVectorStore(chroma_collection=collection)
-storage_context = StorageContext.from_defaults(vector_store=vector_store)
-
+###vector_store = ChromaVectorStore(chroma_collection=collection)
+###storage_context = StorageContext.from_defaults(vector_store=vector_store)
 # -----------------------------
 # Build or load index
 # -----------------------------
 # Check what's actually in Chroma right now
-existing_chunks = collection.count()
+###existing_chunks = collection.count()
 # Check if the data directory exists and has files in the data folder
-data_exists = os.path.exists(DATA_PATH) and any(os.scandir(DATA_PATH))
+###data_exists = os.path.exists(data_path) and any(os.scandir(data_path))
 
-if existing_chunks == 0:
-    if data_exists:
-        loader = SimpleDirectoryReader(input_dir=DATA_PATH)
-        docs = loader.load_data()
-        index = VectorStoreIndex.from_documents(docs, storage_context=storage_context, show_progress=True, )
-    else:
+###if existing_chunks == 0:
+###    if data_exists:
+###        loader = SimpleDirectoryReader(input_dir=data_path)
+###        docs = loader.load_data()
+###        index = VectorStoreIndex.from_documents(docs, storage_context=storage_context, show_progress=True, )
+###    else:
         # Create an empty index if no files are found
         # This allows the app to start so you can use the Upload button
-        index = VectorStoreIndex.from_documents( [], storage_context=storage_context   )
-else:
-    index = VectorStoreIndex.from_vector_store(vector_store)
+###        index = VectorStoreIndex.from_documents( [], storage_context=storage_context   )
+###else:
+###    index = VectorStoreIndex.from_vector_store(vector_store)
 
 # -----------------------------
 # Memory
@@ -287,11 +284,12 @@ def delete_single_file(filename: str):
 # ----------------------------------------
 def reset_full_database(session_id):
     # 1. Delete and recreate the collection in Chroma
-    client.delete_collection(COLLECTION_NAME)
+    client.delete_collection(collection_name)
     
     # 2. Re-initialize the globals
     global collection, vector_store, storage_context, index
-    collection = client.get_or_create_collection(COLLECTION_NAME)
+    collection_name = f"documents_{session_id}"
+    collection = client.get_or_create_collection(collection_name)
     vector_store = ChromaVectorStore(chroma_collection=collection)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
     
@@ -307,3 +305,44 @@ def reset_full_database(session_id):
 def is_file_indexed(filename):
     results = collection.get(where={"file_name": filename})
     return len(results['ids']) > 0
+
+
+# Create data paths and  collections
+def initialize_paths(data_path, db_path, collection_name):
+    global client, collection, vector_store, storage_context, index
+    global DATA_PATH   # <‑‑ store it for later use
+    DATA_PATH = data_path
+    # Ensure folders exist
+    os.makedirs(data_path, exist_ok=True)
+    os.makedirs(db_path, exist_ok=True)
+
+    # Chroma setup
+    client = chromadb.PersistentClient(path=db_path)
+    collection = client.get_or_create_collection(collection_name)
+
+    vector_store = ChromaVectorStore(chroma_collection=collection)
+    storage_context = StorageContext.from_defaults(vector_store=vector_store)
+
+    # -----------------------------
+    # Build or load index
+    # -----------------------------
+    existing_chunks = collection.count()
+    data_exists = os.path.exists(data_path) and any(os.scandir(data_path))
+
+    if existing_chunks == 0:
+        if data_exists:
+            loader = SimpleDirectoryReader(input_dir=data_path)
+            docs = loader.load_data()
+            index = VectorStoreIndex.from_documents(
+                docs,
+                storage_context=storage_context,
+                show_progress=True
+            )
+        else:
+            # Empty index
+            index = VectorStoreIndex.from_documents(
+                [],
+                storage_context=storage_context
+            )
+    else:
+        index = VectorStoreIndex.from_vector_store(vector_store)
