@@ -1,3 +1,4 @@
+from operator import index
 import os
 import shutil
 import base64
@@ -10,11 +11,12 @@ from dotenv import load_dotenv
 from llama_index.core import ( VectorStoreIndex, SimpleDirectoryReader, StorageContext, Settings, Document )
 
 from llama_index.core import memory
+from llama_index.core import chat_engine
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.core.memory import ChatMemoryBuffer
 from llama_index.llms.openai import OpenAI
-from llama_index.core.chat_engine import ContextChatEngine
+from llama_index.core.chat_engine import CondensePlusContextChatEngine, ContextChatEngine
 from llama_index.core.schema import QueryBundle
 from llama_index.postprocessor.rankgpt_rerank import RankGPTRerank
 from llama_index.readers.file import DocxReader
@@ -82,68 +84,73 @@ class MyRagSystem:
     # -----------------------------
     # ASK
     # -----------------------------
-    def ask(self, question, required_words="", mode="Match All", min_score=0.15):
+    def ask(self, question, required_words="", mode="Match All", min_score=0.15, reset_memory=True):
+        from llama_index.core.query_engine import RetrieverQueryEngine
+        from llama_index.core.chat_engine import CondensePlusContextChatEngine
+        from llama_index.core.postprocessor import SimilarityPostprocessor
+        #from llama_index.core.llms import OpenAI
+        from llama_index.postprocessor.rankgpt_rerank import RankGPTRerank
+        from llama_index.llms.openai import OpenAI    
 
-        retriever = self.index.as_retriever(similarity_top_k=20)
-        nodes = retriever.retrieve(question)
+        # IMPORTANT: If you are using CondensePlusContext, 
+        # sometimes the internal buffer needs a fresh start
+        # 1. Reset memory if "Fresh Search" is checked in Streamlit
+        if reset_memory:
+            self.memory.reset()
+            print("Log: Memory has been wiped for a fresh start.")
 
-        # Similarity filter
-        nodes = [n for n in nodes if getattr(n, "score", 0) >= min_score]
+        # 2. Define the Base Retriever
+        base_retriever = self.index.as_retriever(similarity_top_k=15)
 
-        # Keyword filter
-        if required_words:
-            keywords = [k.strip().lower() for k in required_words.split(",") if k.strip()]
-            filtered = []
-
-            for n in nodes:
-                content = n.node.get_content().lower()
-                if mode == "Match All":
-                     if all(k in content for k in keywords):
-                         filtered.append(n)
-                else:
-                    if any(k in content for k in keywords):
-                         filtered.append(n)
-
-            nodes = filtered
-        if not nodes:
-            return "No relevant documents found.", [], []
-
-        # Rerank
+        # 3. Prepare Post-Processors (Filters + Reranker)
+        postprocessors = [SimilarityPostprocessor(similarity_cutoff=min_score)]
+        # Keyword Filter logic remains manual because it depends on user input strings
+        # We will apply it to the final response nodes below.
+    
+        # LLM Reranker (Top 3)
         reranker = RankGPTRerank(llm=OpenAI(model="gpt-4o-mini"), top_n=3)
-        reranked_nodes = reranker.postprocess_nodes(nodes, query_bundle=QueryBundle(question))
+        postprocessors.append(reranker)
 
-        # Use reranked nodes
-        class ManualRetriever:
-            def __init__(self, nodes):
-                self.nodes = nodes
+        # 4. Build the Query Engine (Fixed Initialization)
+        # Using from_args allows easier configuration of the response synthesizer
+        query_engine = RetrieverQueryEngine.from_args( retriever=base_retriever, node_postprocessors=postprocessors,
+                        response_mode="compact"  )
 
-            def retrieve(self, query):
-                return self.nodes
-
-        chat_engine = ContextChatEngine.from_defaults(
-            retriever=ManualRetriever(reranked_nodes),
-            memory=self.memory,
-            system_prompt="You are a helpful assistant."  )
-
+        # 5. Build the Chat Engine
+        # This automatically rephrases follow-up questions using conversation history
+        chat_engine = CondensePlusContextChatEngine.from_defaults( 
+                        query_engine=query_engine, 
+                        retriever=base_retriever, 
+                        memory=self.memory,
+                        system_prompt="You are a helpful assistant. Use the provided context to answer accurately."  )
+        # 6. Get response
         response = chat_engine.chat(question)
 
-        # Build output
+        # 7. Extract nodes for your UI sources (using nodes from the response)
+        # This ensures your "Sources & Evidence" match what the AI actually used
+        final_nodes = response.source_nodes
         snippets = []
         sources = []
         seen = set()
-
-        for i, n in enumerate(reranked_nodes):
-            fname = n.node.metadata.get("file_name", "Unknown")
+    
+        for i, n in enumerate(final_nodes):
+            fname = n.node.metadata.get("file_name", "Unknown Document")
+            # Manual Keyword Filter logic (LlamaIndex doesn't have a native one-to-one for your mode)
+            if required_words:
+                keywords = [k.strip().lower() for k in required_words.split(",") if k.strip()]
+                content = n.node.get_content().lower()
+                if mode == "Match All" and not all(k in content for k in keywords):
+                    continue
+                if mode == "Match Any" and not any(k in content for k in keywords):
+                    continue
 
             if fname not in seen:
-                sources.append((fname, round(1 - i * 0.1, 3)))
+                score = round(n.score, 3) if n.score is not None else 1.0
+                sources.append((fname, score))
                 seen.add(fname)
-
-            snippets.append({
-                "file": fname,
-                "similarity_score": getattr(n, "score", 0),
-                "relevance_score": 1 - i * 0.1,
-                "snippet": n.node.get_content()[:250]  })
+            
+            snippets.append({ "file": fname, "similarity_score": getattr(n, "score", 0),  "relevance_score": 1 - i * 0.1, 
+            "snippet": n.node.get_content()[:300] + "..." })
 
         return response.response, sources, snippets
 

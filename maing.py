@@ -18,7 +18,6 @@ else:
     session_id = str(uuid.uuid4())[:8]
     st.session_state.session_id = session_id
     st.query_params["session_id"] = session_id
-## print(f"Current session_id from Query Param: {session_id}")
 
 user_data_path = f"data/{st.session_state.session_id}"
 os.makedirs(user_data_path, exist_ok=True)
@@ -93,6 +92,8 @@ st.markdown(
     """,
     unsafe_allow_html=True ) 
 
+fresh_search = st.checkbox( "🔄 Fresh search (ignore previous answers)", 
+                           value=True ) # ✅ default ON 
 # -----------------------------
 # Sidebar Options
 # -----------------------------
@@ -381,17 +382,18 @@ if prompt := st.chat_input("Ask something about your documents"):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             # NEW: build context-aware prompt
-            if "last_source" in st.session_state:
-                enhanced_prompt = f"""
-                    Focus ONLY on the document: {st.session_state['last_source']}
+            #if "last_source" in st.session_state:
+            #    enhanced_prompt = f"""
+            #        Focus ONLY on the document: {st.session_state['last_source']}
 
-                    User question:
-                    {prompt}
-                    """
-            else:
-                enhanced_prompt = prompt
+            #        User question:
+            #        {prompt}
+            #        """
+            #else:
+            #    enhanced_prompt = prompt
 
-            answer, sources, snippets = rag_system.ask( enhanced_prompt, required_words=keywordsx, mode=match_mode, min_score=min_score )
+            answer, sources, snippets = rag_system.ask( prompt, required_words=keywordsx, 
+                                                       mode=match_mode, min_score=min_score, reset_memory = fresh_search )
 
             if sources:
                 st.session_state["last_source"] = sources[0][0]  # NEW: store top document
