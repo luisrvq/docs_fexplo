@@ -1,0 +1,3 @@
+[ { "question": "How to use the assistant?", 
+"answer": "Upload your documents (max 15 each time) then ask questions about them", "category": "Rag usage" }, 
+{ "question": "What is the purpose of the Fresh search button?", "answer": "Use it if you want to start a new different question not related to previous findings.", "category": " Rag usage " } ]

@@ -41,6 +41,14 @@ if "rag" not in st.session_state:
     st.session_state.rag = rag.MyRagSystem(st.session_state.session_id)
 rag_system = st.session_state.rag
 
+# for FAQs
+# Get the directory where your script is running
+base_dir = os.path.dirname(os.path.abspath(__file__))
+faq_path = os.path.join(base_dir, "faqs_maing.json")
+faq_docs = rag_system.load_faqs(faq_path) # Load FAQs from a JSON file
+# Add these to your current index alongside your other documents
+rag_system.index.insert_nodes(faq_docs)
+
 # ----------------------------------------------
 # UI Helpers
 # ----------------------------------------------
@@ -169,7 +177,7 @@ with st.sidebar:
     if uploaded_files and not st.session_state.files_processed:
         total = len(uploaded_files)
         if total > 15:
-            st.error(f"You've selected {total} files. Max allowed is 15.")
+            st.error(f"You've selected {total} files. Max allowed is 15. Delete the excess files")
         else:
             for uploaded in uploaded_files:
                 filename = uploaded.name

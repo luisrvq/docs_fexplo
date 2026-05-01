@@ -88,7 +88,6 @@ class MyRagSystem:
         from llama_index.core.query_engine import RetrieverQueryEngine
         from llama_index.core.chat_engine import CondensePlusContextChatEngine
         from llama_index.core.postprocessor import SimilarityPostprocessor
-        #from llama_index.core.llms import OpenAI
         from llama_index.postprocessor.rankgpt_rerank import RankGPTRerank
         from llama_index.llms.openai import OpenAI    
 
@@ -100,7 +99,7 @@ class MyRagSystem:
             print("Log: Memory has been wiped for a fresh start.")
 
         # 2. Define the Base Retriever
-        base_retriever = self.index.as_retriever(similarity_top_k=15)
+        base_retriever = self.index.as_retriever(similarity_top_k=10)
 
         # 3. Prepare Post-Processors (Filters + Reranker)
         postprocessors = [SimilarityPostprocessor(similarity_cutoff=min_score)]
@@ -228,4 +227,23 @@ class MyRagSystem:
     def reset_memory(self):
         self.memory.reset()
 
+    # -----------------------------
+    # Load faqs_maing.json (FAQs)
+    # -----------------------------
+    def load_faqs(self, json_file_path):
+        import json
+        with open(json_file_path, 'r') as f:
+            faq_data = json.load(f)
+            faq_documents = []
+            for item in faq_data:
+                # We put the question in the main text so the Vector Search finds it
+                # We put the answer in the metadata or text so the LLM can read it
+                doc_content = f"Question: {item['question']}\nAnswer: {item['answer']}" 
+                doc = Document( text=doc_content, 
+                           metadata={
+                                    "file_name": "FAQs",
+                                    "category": item["category"],
+                                    "type": "official_faq"  }  )
+                faq_documents.append(doc)
+        return faq_documents
 ## --------------000000------------------ ##
