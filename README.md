@@ -1,87 +1,73 @@
-# 🧠 AI RAG Personal Assistant (Multimodal)
+# 🧠 AI Personal Assistant (Multimodal)
 
-An interactive **Retrieval-Augmented Generation (RAG)** application built with Streamlit, LlamaIndex, and OpenAI.
-
-This assistant allows users to upload documents and images, query their content using natural language, and receive answers with **sources, evidence, and explainability scores**.
-
----
-
-## 🚀 Features
-
-* 📄 Upload and index documents (PDF, DOCX, TXT)
-* 🖼️ Image understanding (PNG, JPG) using OpenAI Vision
-* 🔍 Semantic search with vector embeddings
-* 🧠 Context-aware chat (follow-up questions supported)
-* 📊 Dual scoring:
-
-  * **Similarity score** (retriever)
-  * **Relevance score** (reranker)
-* 🎯 Keyword filtering (Match All / Match Any)
-* ⚙️ Adjustable similarity threshold
-* 📂 Document management UI (preview, delete, download)
-* ☁️ Deployable on Streamlit Community Cloud
+An enterprise-grade **Retrieval-Augmented Generation (RAG)** application. 
+Unlike basic RAG setups, this assistant uses a multi-stage pipeline including 
+**RankGPT reranking** and **contextual query condensation** to ensure highly accurate, conversational answers.
+[![Streamlit App](https://streamlit.io)](https://maingpy-6tg79pvqkn8plxpn7lsxsc.streamlit.app)
 
 ---
 
-## 🏗️ Architecture
+## 🌟 Key Technical Features
+
+*   **Multimodal Ingestion**: Seamlessly indexes PDFs, DOCX, TXT, and **Images** (via OpenAI Vision OCR).
+*   **Advanced Retrieval Pipeline**:
+    *   **Stage 1**: Semantic Vector Search.
+    *   **Stage 2**: Metadata & Keyword Filtering (Hard-match constraints).
+    *   **Stage 3**: **RankGPT Reranking** (Uses LLMs to re-order the top results for maximum relevance).
+*   **Stateful Conversational Memory**: Uses `CondensePlusContext` logic to handle complex follow-up questions (e.g., "Summarize *that* document").
+*   **Explainable AI (XAI)**: Provides a "Sources & Evidence" panel with similarity scores and snippet previews for every claim made.
+*   **FAQ Integration**: Supports a vetted `faqs.json` for instant, authoritative answers to common queries.
+
+---
+
+## 🏗️ The Pipeline Architecture
 
 ```text
-User Query
-   ↓
-Retriever (Vector Search)
-   ↓
-Similarity Filter (min_score)
-   ↓
-Keyword Filter
-   ↓
-Reranker (LLM-based)
-   ↓
-ContextChatEngine
-   ↓
-Answer + Sources + Scores
+User Input → Query Condenser (History Aware) → Vector Search (Top 10) 
+     ↓
+Similarity Filter (min_score) → Keyword Hard-Filter 
+     ↓
+RankGPT Reranker (Top 3) → LLM Synthesis → Final Answer + Citations
 ```
 
 ---
 
 ## 🛠️ Tech Stack
 
-* Python
-* Streamlit
-* LlamaIndex
-* OpenAI API (GPT + Vision)
-* Vector Store (local)
+*   **Framework**: [LlamaIndex](https://llamaindex.ai) (Data Orchestration)
+*   **Frontend**: [Streamlit](https://streamlit.io/)
+*   **Models**: OpenAI GPT-4o (Reasoning), GPT-4o-mini (Reranking/Vision), Text-Embedding-3-Small
+*   **Vector Store**: ChromaDB / SimpleVectorStore
+*   **Language**: Python
 
 ---
 
-## 📦 Installation (Local)
+## 🚀 Quick Start
 
-### 1. Clone the repository
+### 1. Clone & Setup
 
 ```bash
 git clone https://github.com/luisrvq/docs_fexplo.git
-cd YOUR_REPO
+cd docs_fexplo
+python -m venv venv
+source venv/bin/activate  # venv\Scripts\activate on Windows
+pip install -r requirements.txt
 ```
-
-### 2. Create virtual environment
-
 ```bash
 python -m venv venv
 venv\Scripts\activate   # Windows
 # source venv/bin/activate  # Mac/Linux
 ```
 
+### 2. Configuration
+Create a `.env` file in the root directory:
+```env
+OPENAI_API_KEY=your_api_key_here
+```
 ### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
-```
-
-### 4. Set environment variables
-
-Create a `.env` file:
-
-```env
-OPENAI_API_KEY=your_api_key_here
 ```
 
 ---
@@ -89,7 +75,7 @@ OPENAI_API_KEY=your_api_key_here
 ## ▶️ Run the app
 
 ```bash
-streamlit run mainf.py
+streamlit run maing.py
 ```
 
 ---
@@ -121,10 +107,11 @@ OPENAI_API_KEY = "your_api_key_here"
 .
 ├── app/
 ├── data/                # Uploaded documents
-├── mainf.py             # Streamlit UI
-├── rag_pipelinef.py     # RAG logic
+├── maing.py             # Streamlit UI, session state management, and file handling
+├── rag_pipelineg.py     # The core RAG logic, custom retrievers, and reranking post-processors
 ├── requirements.txt
 ├── .gitignore
+├── {} faqs_maing.json   # Pre-vetted Q&A pairs for high-precision retrieval
 └── README.md
 ```
 
@@ -140,29 +127,25 @@ OPENAI_API_KEY = "your_api_key_here"
 
 ## 🔮 Future Improvements
 
-* 📊 Visual score indicators (bars/colors)
-* 🧾 Highlight matched text in snippets
-* 🗂️ Multi-document filtering
-* 🧠 Answer confidence scoring
-* 🧹 Bulk document management
+- [ ] **Hybrid Search**: Combining BM25 (keyword) with Vector search.
+- [ ] **Local LLM Support**: Integration with Ollama for privacy-focused queries.
+- [ ] **Streaming Responses**: For a more "ChatGPT-like" typing experience.
 
 ---
 ## 📸 Screenshots
 
 ### Sidebar & Controls
-![Sidebar](assets/sidebar.png)
+![Sidebar](assets/maing_sidebar.png)
 
 ### Chat & Sources
-![Chat](assets/chat.png)
+![Chat](assets/maing_chat.png)
 
 ---
 
 ## 👤 Author
-
 Luis Solis Vasquez
 
 ---
 
-## ⭐ If you like this project
+## ⭐ If you like this project or find it helpful, please give it a star! **
 
-Give it a star on GitHub ⭐

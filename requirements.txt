@@ -1,12 +1,25 @@
+# Web Framework
 streamlit>=1.56.0
+
+# LlamaIndex Core & Conversational Memory
 llama-index==0.14.20
-llama-index-vector-stores-chroma>=0.5.5
-llama-index-postprocessor-rankgpt-rerank>=0.1.0
-llama-index-embeddings-openai>=0.1.0
+llama-index-core==0.14.20
+llama-index-readers-file
+
+# OpenAI Models & Integrations
+openai>=1.20.0
 llama-index-llms-openai>=0.7.5
-python-dotenv>=1.2.2
+llama-index-embeddings-openai>=0.1.0
+
+# Vector Store & Search
 chromadb>=1.5.7
+llama-index-vector-stores-chroma>=0.5.5
+
+# Advanced Reranking
+llama-index-postprocessor-rankgpt-rerank>=0.1.0
+
+# Utilities
+python-dotenv>=1.2.2
+docx2txt==0.8
 spacy>=3.0.0
 protobuf==3.20.3
-docx2txt
-llama-index-readers-file

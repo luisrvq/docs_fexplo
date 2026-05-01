@@ -43,11 +43,13 @@ rag_system = st.session_state.rag
 
 # for FAQs
 # Get the directory where your script is running
-base_dir = os.path.dirname(os.path.abspath(__file__))
-faq_path = os.path.join(base_dir, "faqs_maing.json")
-faq_docs = rag_system.load_faqs(faq_path) # Load FAQs from a JSON file
-# Add these to your current index alongside your other documents
-rag_system.index.insert_nodes(faq_docs)
+if "faqs_loaded" not in st.session_state:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    faq_path = os.path.join(base_dir, "faqs_maing.json")
+    faq_docs = rag_system.load_faqs(faq_path) # Load FAQs from a JSON file
+    # Add these to your current index alongside your other documents
+    rag_system.index.insert_nodes(faq_docs)
+    st.session_state.faqs_loaded = True
 
 # ----------------------------------------------
 # UI Helpers
@@ -93,15 +95,15 @@ def reveal_in_explorer(file_path):
 # -----------------------------
 st.markdown(
     """
-    <h1 style='font-size:32px;'>AI RAG Personal Assistant</h1>
+    <h1 style='font-size:32px;'>AI Personal Assistant</h1>
     <p style='font-size:18px; color:gray;'>
         Find information across your documents using AI 
     </p>
     """,
     unsafe_allow_html=True ) 
 
-fresh_search = st.checkbox( "🔄 Fresh search (ignore previous answers)", 
-                           value=True ) # ✅ default ON 
+## fresh_search = st.checkbox( "Fresh search (ignore previous answers)", value=True ) # ✅ default ON 
+
 # -----------------------------
 # Sidebar Options
 # -----------------------------
@@ -158,8 +160,13 @@ with st.sidebar:
         st.session_state.session_id = new_id
         st.session_state.messages = [] # Wipes the UI chat hiostory
         rag_system.reset_memory()
-        ##rag_system.initialize_paths( f"data/{new_id}", f"storage/{new_id}", f"documents_{new_id}" ) # Re-init backend with new paths
         st.rerun()
+
+    ## Start fresh seartch
+    st.checkbox( "Fresh search (ignore previous answers)", key="fresh_search", value=True )
+    # Atualiza o estado somente se o usuário clicar
+    fresh_search = st.session_state.fresh_search
+
 
     ## Upload files section
     st.divider()
@@ -177,7 +184,7 @@ with st.sidebar:
     if uploaded_files and not st.session_state.files_processed:
         total = len(uploaded_files)
         if total > 15:
-            st.error(f"You've selected {total} files. Max allowed is 15. Delete the excess files")
+            st.error(f"You've selected {total} files. Max allowed is 15. Delete the excess files and will process remaining files automatically ")
         else:
             for uploaded in uploaded_files:
                 filename = uploaded.name
@@ -389,16 +396,6 @@ if prompt := st.chat_input("Ask something about your documents"):
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            # NEW: build context-aware prompt
-            #if "last_source" in st.session_state:
-            #    enhanced_prompt = f"""
-            #        Focus ONLY on the document: {st.session_state['last_source']}
-
-            #        User question:
-            #        {prompt}
-            #        """
-            #else:
-            #    enhanced_prompt = prompt
 
             answer, sources, snippets = rag_system.ask( prompt, required_words=keywordsx, 
                                                        mode=match_mode, min_score=min_score, reset_memory = fresh_search )

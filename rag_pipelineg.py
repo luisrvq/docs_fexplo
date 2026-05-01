@@ -127,7 +127,7 @@ class MyRagSystem:
 
         # 7. Extract nodes for your UI sources (using nodes from the response)
         # This ensures your "Sources & Evidence" match what the AI actually used
-        final_nodes = response.source_nodes
+        final_nodes = response.source_nodes[:3]  # Extract only the 3 top documents
         snippets = []
         sources = []
         seen = set()
