@@ -1,20 +1,24 @@
 # 🧠 AI Personal Assistant (Multimodal)
 
-An enterprise-grade **Retrieval-Augmented Generation (RAG)** application. 
-Unlike basic RAG setups, this assistant uses a multi-stage pipeline including 
-**RankGPT reranking** and **contextual query condensation** to ensure highly accurate, conversational answers.
-[![Streamlit App](https://streamlit.io)](https://maingpy-6tg79pvqkn8plxpn7lsxsc.streamlit.app)
+An enterprise-grade **Retrieval-Augmented Generation (RAG)** application designed to search, understand, and reason over your private documents.
+Unlike basic RAG setups, this assistant uses a multi-stage retrieval pipeline with 
+**RankGPT reranking** and **contex-awarel query condensation** to ensure highly accurate, conversational answers.
 
+👉 sreamlit badge:  
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://maingpy-6tg79pvqkn8plxpn7lsxsc.streamlit.app)
+
+👉 Live Demo:  
+https://maingpy-6tg79pvqkn8plxpn7lsxsc.streamlit.app
 ---
 
-## 🌟 Key Technical Features
+## 🌟 Key Features
 
 *   **Multimodal Ingestion**: Seamlessly indexes PDFs, DOCX, TXT, and **Images** (via OpenAI Vision OCR).
 *   **Advanced Retrieval Pipeline**:
     *   **Stage 1**: Semantic Vector Search.
     *   **Stage 2**: Metadata & Keyword Filtering (Hard-match constraints).
     *   **Stage 3**: **RankGPT Reranking** (Uses LLMs to re-order the top results for maximum relevance).
-*   **Stateful Conversational Memory**: Uses `CondensePlusContext` logic to handle complex follow-up questions (e.g., "Summarize *that* document").
+*   **Stateful Conversational Memory**: Uses `CondensePlusContext` logic to handle complex follow-up questions (e.g., "Summarize    *that* document").
 *   **Explainable AI (XAI)**: Provides a "Sources & Evidence" panel with similarity scores and snippet previews for every claim made.
 *   **FAQ Integration**: Supports a vetted `faqs.json` for instant, authoritative answers to common queries.
 
@@ -50,13 +54,9 @@ RankGPT Reranker (Top 3) → LLM Synthesis → Final Answer + Citations
 git clone https://github.com/luisrvq/docs_fexplo.git
 cd docs_fexplo
 python -m venv venv
-source venv/bin/activate  # venv\Scripts\activate on Windows
+source venv/bin/activate  # Mac/Linux
+# venv\Scripts\activate   # Windows
 pip install -r requirements.txt
-```
-```bash
-python -m venv venv
-venv\Scripts\activate   # Windows
-# source venv/bin/activate  # Mac/Linux
 ```
 
 ### 2. Configuration
@@ -64,15 +64,9 @@ Create a `.env` file in the root directory:
 ```env
 OPENAI_API_KEY=your_api_key_here
 ```
-### 3. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
 ---
 
-## ▶️ Run the app
+## ▶️ Run the app locally
 
 ```bash
 streamlit run maing.py
@@ -89,7 +83,7 @@ streamlit run maing.py
 5. Set the main file:
 
    ```
-   mainf.py
+   maing.py
    ```
 6. Add secrets:
 
@@ -105,13 +99,14 @@ OPENAI_API_KEY = "your_api_key_here"
 
 ```
 .
-├── app/
-├── data/                # Uploaded documents
+├── app/                 # UI components, helpers
+├── data/                # Uploaded documents (runtime)
+├── .gitkeep
 ├── maing.py             # Streamlit UI, session state management, and file handling
 ├── rag_pipelineg.py     # The core RAG logic, custom retrievers, and reranking post-processors
 ├── requirements.txt
 ├── .gitignore
-├── {} faqs_maing.json   # Pre-vetted Q&A pairs for high-precision retrieval
+├── faqs_maing.json      # Pre-vetted Q&A pairs for high-precision retrieval
 └── README.md
 ```
 
