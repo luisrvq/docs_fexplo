@@ -172,7 +172,7 @@ with st.sidebar:
     st.divider()
     st.markdown("### 📄 Document Management")  
     uploaded_files = st.file_uploader( "Select one or several files (Max. 15) ",
-    type=["pdf", "txt", "docx", "png", "jpg", "jpeg"],
+    type=["pdf", "txt", "docx", "png", "jpg", "jpeg", "csv", "xlsx"],
     accept_multiple_files=True,
     key=f"folder_uploader_{st.session_state.upload_key}" )
     if "files_processed" not in st.session_state:  #Initialize flag
@@ -201,6 +201,12 @@ with st.sidebar:
                     if uploaded.type.startswith("image"):
                         rag_system.ingest_image(path)
                         st.image(uploaded, caption=filename, use_container_width=True)
+                    elif uploaded.type in ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                                           "application/vnd.ms-excel" ]:  
+                        # Excel ingestion (multiple sheets) 
+                        excel_docs = rag_system.load_excel_all_sheets(path, filename) 
+                        for doc in excel_docs:
+                            rag_system.ingest_file(path)
                     else:
                         rag_system.ingest_file(path)
 
@@ -234,35 +240,45 @@ with st.sidebar:
         st.markdown("### 📂 Select a file to delete") 
         files = [f for f in os.listdir(user_data_path) if os.path.isfile(os.path.join(user_data_path, f))]
         if files:
+            if "confirm_delete_file" not in st.session_state:
+                st.session_state.confirm_delete_file = None
+            files = [f for f in os.listdir(user_data_path) if os.path.isfile(os.path.join(user_data_path, f))]
             for i, file in enumerate(files):
                 file_path = os.path.join(user_data_path, file)
-                col1, col2 = st.columns([6, 1])
+                # 🔹 Disable other delete buttons if one file is being confirmed
+                disabled = ( st.session_state.confirm_delete_file is not None and st.session_state.confirm_delete_file != file )
+                col1, col2, col3 = st.columns([5, 1, 3]) 
+                # 📄 File name
                 with col1:
-                    st.markdown(f"📄 **{file}**")
+                    if st.session_state.confirm_delete_file == file:
+                        st.warning(f"⚠️ Confirm delete: {file}")  # 🔹 Highlight selected file
+                    else:
+                        st.markdown(f"📄 **{file}**")
+                # 🗑️ Delete button
                 with col2:
-                    if st.button("🗑️", key=f"delete_{i}", help='Delete file'):
-                        st.session_state["pending_delete"] = file
+                    if st.button("🗑️", key=f"delete_{i}", help="Delete file"):
+                        st.session_state.confirm_delete_file = file
+                # ⚠️ Inline confirmation
+                with col3:
+                    if st.session_state.confirm_delete_file == file:
+                        col_confirm, col_cancel = st.columns(2)
+                        with col_confirm:
+                            if st.button("✅", key=f"confirm_{i}"):
+                                rag_system.delete_single_file(file)
+                                st.toast(f"{file} deleted", icon="🗑️")  # 🔹 Toast notification (modern UX)
+                                st.session_state.confirm_delete_file = None
+                                st.success(f"{file} deleted")
+                                st.rerun()
+                        with col_cancel:
+                            if st.button("❌", key=f"cancel_{i}"):
+                                st.session_state.confirm_delete_file = None
         else:
             st.info("No documents available.")
     
         if st.button("❌ Close Delete Panel", key="close_bottom"):  
             st.session_state.show_delete_panel = False
             st.rerun()
-    
-    # ⚠️ Confirmation
-    if st.session_state.pending_delete:
-        file = st.session_state.pending_delete
-        st.warning(f"⚠️ Delete **{file}**?")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("✅ Confirm", key="confirm_delete"):
-                rag_system.delete_single_file(file)
-                st.success("Deleted!")
-                st.session_state.pending_delete = None
-                st.rerun()
-        with col2:
-            if st.button("❌ Cancel", key="cancel_delete"):
-                st.session_state.pending_delete = None   
+     
     ## ----------------------   
     
     ## Show statistics of # of documents and chunks

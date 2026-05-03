@@ -1,3 +1,4 @@
+from csv import excel
 from operator import index
 import os
 import shutil
@@ -172,6 +173,23 @@ class MyRagSystem:
         doc = Document( text=text,  metadata={"file_name": os.path.basename(path)} )
 
         self.index.insert(doc)
+
+    # -----------------------------
+    # INGEST Excel files
+    # -----------------------------
+    from llama_index.core import Document
+    def load_excel_all_sheets(self, path, filename):
+        import pandas as pd 
+        excel = pd.ExcelFile(path)
+        documents = []
+        for sheet_name in excel.sheet_names: 
+            df = excel.parse(sheet_name) 
+            text = df.to_string(index=False)
+            doc = Document( text=text, 
+                            metadata={ "filename": filename,  "sheet": sheet_name  } ) 
+            documents.append(doc)  
+        return documents
+
 
     # -----------------------------
     # STATS
