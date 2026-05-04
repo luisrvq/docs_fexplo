@@ -9,11 +9,11 @@ import uuid     # Get user session_id for unique file keys
 # First visit → create session_id → store in URL  
 # Refresh → read from URL → reuse 
 # ----------------------------------------------
-
 query_params = st.query_params
 if "session_id" in query_params:
     session_id = query_params["session_id"]
     st.session_state.session_id = session_id
+    print(f"Existing session_id in URL: {session_id}")
 else:
     session_id = str(uuid.uuid4())[:8]
     st.session_state.session_id = session_id
@@ -22,7 +22,7 @@ else:
 user_data_path = f"data/{st.session_state.session_id}"
 os.makedirs(user_data_path, exist_ok=True)
 
-# Used to Clean upload file box  (double check if needed)
+# Used to Clean upload file box 
 if "upload_key" not in st.session_state:
     st.session_state.upload_key = 0
 
@@ -40,6 +40,7 @@ collection_name = f"documents_{st.session_state.session_id}"
 if "rag" not in st.session_state:
     st.session_state.rag = rag.MyRagSystem(st.session_state.session_id)
 rag_system = st.session_state.rag
+print(f"RAG system initialized for session_id: {st.session_state.session_id}")
 
 # for FAQs
 # Get the directory where your script is running
@@ -90,6 +91,7 @@ def reveal_in_explorer(file_path):
     else: # Linux
         subprocess.run(["xdg-open", os.path.dirname(file_path)])
 
+
 # -----------------------------
 # Title of Chat pannel
 # -----------------------------
@@ -102,37 +104,38 @@ st.markdown(
     """,
     unsafe_allow_html=True ) 
 
-## fresh_search = st.checkbox( "Fresh search (ignore previous answers)", value=True ) # ✅ default ON 
-
 # -----------------------------
 # Sidebar Options
 # -----------------------------
 with st.sidebar:
+    ## Start new session buttonn
     st.header("🔍 Session options")
     session_id = st.session_state.session_id
+    # 1. Matching Header Card for Current Session
     st.markdown(
         f"""
-        <div style="display: flex; justify-content: space-between; background-color: rgba(255, 255, 255, 0.05); 
-            padding: 10px; border-radius: 8px; border: 1px solid rgba(151, 151, 151, 0.2);">
-            <div style="text-align: left; flex: 1;">
-                <span style="font-size: 18px; font-weight: bold;">Current session_id: {session_id} </span>
-            </div>            
-        """,
-        unsafe_allow_html=True  ) 
+        <div style="background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(151,151,151,0.2); 
+                    border-radius: 8px; padding: 10px; margin-bottom: 15px; text-align: center;">
+            <p style="color: gray; font-size: 10px; margin: 0; text-transform: uppercase;">Active Session</p>
+            <p style="font-size: 16px; font-weight: bold; margin: 0; color: #55aaff;">{session_id}</p>
+        </div>
+        """, unsafe_allow_html=True  )
 
-    ## Switch session
+    ## 2. Switch Session Section
     st.sidebar.markdown("### 🔄 Switch Session")
-    # Create 3 columns: input | open | cancel
-    col1, col2, col3 = st.sidebar.columns([4, 1, 1])
-    with col1:
+    # Create 3 columns: input | open | cancel Using columns to align the input and buttons perfectly
+    col_input, col_go, col_x = st.columns([3, 1, 1])
+    with col_input:
         new_session_id = st.text_input(
-            "Enter session ID",
-            placeholder="e.g. ab12cd34",
-            label_visibility="collapsed" ) # 🔥 removes extra label spac
-    with col2:
-        open_clicked = st.button("➡️", help="Open session")
-    with col3:
-        cancel_clicked = st.button("❌", help="Cancel")
+            "Enter session ID", placeholder="e.g. ab12cd34",  label_visibility="collapsed" ) # 🔥 removes extra label spac
+    with col_go:
+        st.markdown('<div style="margin-top: 2px;">', unsafe_allow_html=True)  # Using a slight top margin to align with the text input
+        open_clicked = st.button("➡️", help="Open session", key="switch_go")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col_x:
+        st.markdown('<div style="margin-top: 2px;">', unsafe_allow_html=True)
+        cancel_clicked = st.button("❌", help="Clear", key="switch_clear")
+        st.markdown('</div>', unsafe_allow_html=True)
     # Handle actions
     if open_clicked:
         if new_session_id:
@@ -142,7 +145,6 @@ with st.sidebar:
             st.session_state.messages = [] # Wipes the UI chat hiostory
             rag_system.reset_memory()
             st.session_state.rag = rag.MyRagSystem(new_session_id)
-            ##rag_system.initialize_paths( f"data/{new_session_id}", f"storage/{new_session_id}", f"documents_{new_session_id}" ) # Re-init backend with new paths
             st.rerun()
         else:
             st.warning("Enter a session ID")
@@ -151,8 +153,7 @@ with st.sidebar:
         st.session_state.switch_session_input = ""
         st.rerun()
 
-    ## Reset session buttonn
-    #st.sidebar.markdown("---")
+    ## Start new session buttonn
     if st.sidebar.button("🔄 Start New Session"):
         new_id = str(uuid.uuid4())[:8]
         st.session_state.clear()   # Optional: clear chat memory
@@ -168,9 +169,10 @@ with st.sidebar:
     fresh_search = st.session_state.fresh_search
 
 
-    ## Upload files section
+    ## DOCUMENT MANAGEMENT SECTION
     st.divider()
-    st.markdown("### 📄 Document Management")  
+    st.markdown("### 📄 Document Management") 
+    ## Upload files section 
     uploaded_files = st.file_uploader( "Select one or several files (Max. 15) ",
     type=["pdf", "txt", "docx", "png", "jpg", "jpeg", "csv", "xlsx"],
     accept_multiple_files=True,
@@ -215,6 +217,45 @@ with st.sidebar:
             # Reset uploader
             st.session_state.upload_key += 1
             st.rerun()
+
+    ## Show statistics of # of documents and chunks
+    stats = rag_system.get_stats()
+    st.markdown("#### 🗄 Knowledge Base <span style='font-size: 14px; color: gray;'>(ingestion statistics)</span>", unsafe_allow_html=True)
+    # Create two columns for the side-by-side look
+    col_blocks, col_docs = st.columns(2)
+
+    with col_blocks:
+        st.markdown(
+            f"""
+            <div style="background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(151,151,151,0.2); 
+                        border-radius: 8px; padding: 10px; text-align: center;">
+                <p style="color: gray; font-size: 10px; margin: 0; text-transform: uppercase;">Blocks</p>
+                <p style="font-size: 18px; font-weight: bold; margin: 0;">{stats['chunks']}</p>
+            </div>
+            """, unsafe_allow_html=True   )
+
+    with col_docs:
+        st.markdown(
+            f"""
+            <div style="background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(151,151,151,0.2); 
+                        border-radius: 8px; padding: 10px; text-align: center; margin-bottom: 15px;">   <!-- Added margin here -->
+                <p style="color: gray; font-size: 10px; margin: 0; text-transform: uppercase;">Docs</p>
+                <p style="font-size: 18px; font-weight: bold; margin: 0;">{stats['documents']}</p>
+            </div>
+            """, unsafe_allow_html=True )
+    
+    # -----------------------------
+    # 👁️ View Documents (NEW)
+    # -----------------------------
+    with st.expander("👁️ View Documents", expanded=False):
+        files = [f for f in os.listdir(user_data_path) if os.path.isfile(os.path.join(user_data_path, f))]
+
+        if files:
+            for file in sorted(files):
+                st.markdown(f"📄 {file}")
+        else:
+            st.info("No documents uploaded.")
+
     ## ----------------------
     ## Delete files section  
     ## ----------------------  
@@ -251,26 +292,35 @@ with st.sidebar:
                 # 📄 File name
                 with col1:
                     if st.session_state.confirm_delete_file == file:
-                        st.warning(f"⚠️ Confirm delete: {file}")  # 🔹 Highlight selected file
+                        st.warning(f"⚠️ Confirm delete:\n {file}")  # 🔹 Highlight selected file
                     else:
-                        st.markdown(f"📄 **{file}**")
+                        if file.endswith(".pdf"):    
+                             iconx = "📕"
+                        elif file.endswith(".docx"):
+                            iconx = "📘"
+                        elif file.endswith(".xlsx"):
+                            iconx = "📊"
+                        else:
+                            iconx = "📄"
+                        short_name = file if len(file) < 33 else file[:30] + "..."
+                        st.markdown(f"{iconx} **{short_name}**")
                 # 🗑️ Delete button
                 with col2:
-                    if st.button("🗑️", key=f"delete_{i}", help="Delete file"):
+                    if st.button("🗑️", key=f"delete_{i}", help="Delete this file"):
                         st.session_state.confirm_delete_file = file
                 # ⚠️ Inline confirmation
                 with col3:
                     if st.session_state.confirm_delete_file == file:
                         col_confirm, col_cancel = st.columns(2)
                         with col_confirm:
-                            if st.button("✅", key=f"confirm_{i}"):
+                            if st.button("✅", key=f"confirm_{i}", help="Confirm deletion of this file"):
                                 rag_system.delete_single_file(file)
                                 st.toast(f"{file} deleted", icon="🗑️")  # 🔹 Toast notification (modern UX)
                                 st.session_state.confirm_delete_file = None
                                 st.success(f"{file} deleted")
                                 st.rerun()
                         with col_cancel:
-                            if st.button("❌", key=f"cancel_{i}"):
+                            if st.button("❌", key=f"cancel_{i}", help="Cancel deletion"):
                                 st.session_state.confirm_delete_file = None
         else:
             st.info("No documents available.")
@@ -280,32 +330,10 @@ with st.sidebar:
             st.rerun()
      
     ## ----------------------   
-    
-    ## Show statistics of # of documents and chunks
-    st.divider()  
-    stats = rag_system.get_stats()
-    st.markdown(
-        f"""
-        <div style="margin-bottom: 10px;">
-            <h3 style='margin-bottom: 0px;'>🗄️ Knowledge Base</h3>
-            <p style='font-size:14px; color:gray; margin-top: 0px;'>System ingestion statistics</p>
-        </div>
-        
-        <div style="display: flex; justify-content: space-between; background-color: rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 8px; border: 1px solid rgba(151, 151, 151, 0.2);">
-            <div style="text-align: center; flex: 1;">
-                <span style="color: gray; font-size: 11px; text-transform: uppercase;">Blocks</span><br>
-                <span style="font-size: 20px; font-weight: bold;">{stats['chunks']}</span>
-            </div>
-            <div style="border-left: 1px solid rgba(151, 151, 151, 0.3); margin: 0 15px;"></div>
-            <div style="text-align: center; flex: 1;">
-                <span style="color: gray; font-size: 11px; text-transform: uppercase;">Docs</span><br>
-                <span style="font-size: 20px; font-weight: bold;">{stats['documents']}</span>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True  )
 
-    ## Filters
+    # -----------------------------    
+    # Filters
+    # -----------------------------
     st.sidebar.markdown( 
         "<h3 style='margin-bottom:5px;'>🔎 Keyword Filter</h3>",
         unsafe_allow_html=True  )
@@ -321,7 +349,7 @@ with st.sidebar:
     # THE CLEAR BUTTON: It calls our reset function when clicked
     st.button("Clear All Filters", on_click=clear_all_filters, use_container_width=True)
 
-    ## Delete all the documents from the database
+    ## Delete all the documents from the database 
     st.divider()
     st.subheader("⚙️ System Maintenance")
     
