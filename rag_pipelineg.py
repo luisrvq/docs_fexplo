@@ -177,17 +177,23 @@ class MyRagSystem:
     # -----------------------------
     # INGEST Excel files
     # -----------------------------
-    from llama_index.core import Document
     def load_excel_all_sheets(self, path, filename):
-        import pandas as pd 
+        from llama_index.core import Document
+        import pandas as pd
+
         excel = pd.ExcelFile(path)
         documents = []
+        
         for sheet_name in excel.sheet_names: 
             df = excel.parse(sheet_name) 
-            text = df.to_string(index=False)
-            doc = Document( text=text, 
-                            metadata={ "filename": filename,  "sheet": sheet_name  } ) 
-            documents.append(doc)  
+            ##text = df.to_string(index=False)
+            ##doc = Document( text=text, 
+            ##                metadata={ "filename": filename,  "sheet": sheet_name  } )
+            markdown_table = df.to_markdown(index=False)    # Convert the entire sheet to a Markdown table
+            content = f"### Sheet: {sheet_name}\n\n{markdown_table}"  # wrap the table in a clear header so the AI knows which sheet it is reading
+            doc = Document( text=content, metadata={ "file_name": filename, "sheet_name": sheet_name, "data_type": "structured_table" }  ) 
+            documents.append(doc)
+
         return documents
 
 
@@ -196,9 +202,25 @@ class MyRagSystem:
     # -----------------------------
     def get_stats(self):
         metas = self.collection.get().get("metadatas", [])
-        docs = len(set(m.get("file_name") for m in metas if m)) if metas else 0
+        ##docs = len(set(m.get("file_name") for m in metas if m)) if metas else 0
+        ##return { "chunks": self.collection.count(),  "documents": docs }
+        user_docs = set()  # User uploaded documents only
+        faq_docs = set()   # FAQ documents
+        for m in metas:
+            if not m: 
+                continue
+            file_name = m.get("file_name", "Unknown")
+            doc_type = m.get("type", "user_upload") 
+            if doc_type == "official_faq":
+                faq_docs.add(file_name)
+            else:
+                user_docs.add(file_name)
 
-        return { "chunks": self.collection.count(),  "documents": docs }
+        return {
+            "chunks": self.collection.count(),
+            "documents": len(user_docs),
+            "faq_documents": len(faq_docs),
+            "total_documents": len(user_docs) + len(faq_docs)  }
 
     # -----------------------------
     # DELETE FILE

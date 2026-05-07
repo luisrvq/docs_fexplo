@@ -208,7 +208,8 @@ with st.sidebar:
                         # Excel ingestion (multiple sheets) 
                         excel_docs = rag_system.load_excel_all_sheets(path, filename) 
                         for doc in excel_docs:
-                            rag_system.ingest_file(path)
+                            ##rag_system.ingest_file(path)
+                            rag_system.index.insert(doc) # Directly insert each sheet
                     else:
                         rag_system.ingest_file(path)
 
@@ -222,7 +223,7 @@ with st.sidebar:
     stats = rag_system.get_stats()
     st.markdown("#### 🗄 Knowledge Base <span style='font-size: 14px; color: gray;'>(ingestion statistics)</span>", unsafe_allow_html=True)
     # Create two columns for the side-by-side look
-    col_blocks, col_docs = st.columns(2)
+    col_blocks, col_docs, col_faq = st.columns(3)
 
     with col_blocks:
         st.markdown(
@@ -243,6 +244,25 @@ with st.sidebar:
                 <p style="font-size: 18px; font-weight: bold; margin: 0;">{stats['documents']}</p>
             </div>
             """, unsafe_allow_html=True )
+        
+    with col_faq:
+        st.markdown(
+            f"""
+            <div style="background-color: rgba(255, 255, 255, 0.05);
+                        border: 1px solid rgba(151,151,151,0.2);
+                        border-radius: 8px;
+                        padding: 10px;
+                        text-align: center;
+                        margin-bottom: 15px;">
+                <p style="color: gray; font-size: 10px; margin: 0;
+                        text-transform: uppercase;">FAQs</p>
+                <p style="font-size: 18px; font-weight: bold; margin: 0;">
+                    {stats['faq_documents']}
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     
     # -----------------------------
     # 👁️ View Documents (NEW)
@@ -252,7 +272,19 @@ with st.sidebar:
 
         if files:
             for file in sorted(files):
-                st.markdown(f"📄 {file}")
+                ##st.markdown(f"📄 {file}")
+                if file.endswith(".pdf"):
+                    iconx = "📕"
+                elif file.endswith(".docx"):
+                    iconx = "📘"
+                elif file.endswith(".xlsx"):
+                    iconx = "📊"
+                elif file.endswith(".png") or file.endswith(".jpg") or file.endswith(".jpeg"):
+                    iconx = "🖼️"
+                else:
+                    iconx = "📄"
+                short_name = file if len(file) < 33 else file[:30] + "..."
+                st.markdown(f"{iconx} **{short_name}**")
         else:
             st.info("No documents uploaded.")
 
@@ -300,6 +332,8 @@ with st.sidebar:
                             iconx = "📘"
                         elif file.endswith(".xlsx"):
                             iconx = "📊"
+                        elif file.endswith(".png") or file.endswith(".jpg") or file.endswith(".jpeg"):
+                            iconx = "🖼️"
                         else:
                             iconx = "📄"
                         short_name = file if len(file) < 33 else file[:30] + "..."
@@ -392,25 +426,26 @@ for i, m in enumerate(st.session_state.messages):
                     if item["file"].endswith((".png", ".jpg", ".jpeg")):
                         st.image(f"{user_data_path}/{item['file']}", width=200)
                     else:
-                        ##st.caption(f"Source: {item['file']} | Score: {item['score']}")
-                        st.caption( f"📄 {item['file']} | "
-                                    f"Similarity: {item.get('similarity_score', 0):.2f} | "
-                                    f"Relevance: {item.get('relevance_score', 0):.2f}" )
-                        st.info(item["snippet"])
+                        if item.get("type") == "official_faq":
+                            st.caption( f"❓ FAQ Knowledge | "
+                                        f"Similarity: {item.get('similarity_score', 0):.2f} | "
+                                        f"Relevance: {item.get('relevance_score', 0):.2f}"   )
+                        else:
+                            st.caption( f"📄 {item['file']} | "
+                                        f"Similarity: {item.get('similarity_score', 0):.2f} | "
+                                        f"Relevance: {item.get('relevance_score', 0):.2f}" )
+                            st.info(item["snippet"])
 
                     full_path = os.path.abspath(f"{user_data_path}/{item['file']}")
-
                     # Unique key per message + item
                     render_file_action( file_name=item["file"], full_path=full_path, key=f"{i}_{j}" )
-
                     st.divider()
+
 for key in st.session_state:              # 3️⃣ 🔁 Re-render stored results
     if key.startswith("result_"):
         data = st.session_state[key]
-
         with st.chat_message("assistant"):
             st.markdown(data["answer"])
-
             if data["sources"]:
                 with st.expander("Sources & Evidence", expanded=True):
                     for i, item in enumerate (data["snippets"]):
@@ -418,11 +453,15 @@ for key in st.session_state:              # 3️⃣ 🔁 Re-render stored result
                         # Preview
                         if item["file"].endswith((".png", ".jpg", ".jpeg")):
                             st.image(f"{user_data_path}/{item['file']}", width=200)
+                    else:
+                        if item.get("type") == "official_faq":
+                            st.caption( f"❓ FAQ Knowledge | "
+                                        f"Similarity: {item.get('similarity_score', 0):.2f} | "
+                                        f"Relevance: {item.get('relevance_score', 0):.2f}"   )
                         else:
-                            ##st.caption(f"Source: {item['file']} | Score: {item['score']}")
                             st.caption( f"📄 {item['file']} | "
                                         f"Similarity: {item.get('similarity_score', 0):.2f} | "
-                                        f"Relevance: {item.get('relevance_score', 0):.2f}"  )
+                                        f"Relevance: {item.get('relevance_score', 0):.2f}" )
                             st.info(item["snippet"])
 
                         # Button
