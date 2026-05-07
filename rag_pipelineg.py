@@ -128,7 +128,7 @@ class MyRagSystem:
 
         # 7. Extract nodes for your UI sources (using nodes from the response)
         # This ensures your "Sources & Evidence" match what the AI actually used
-        final_nodes = response.source_nodes[:3]  # Extract only the 3 top documents
+        final_nodes = response.source_nodes[:10]  # Extract only the 3 top documents
         snippets = []
         sources = []
         seen = set()
@@ -148,9 +148,8 @@ class MyRagSystem:
                 score = round(n.score, 3) if n.score is not None else 1.0
                 sources.append((fname, score))
                 seen.add(fname)
-            
-            snippets.append({ "file": fname, "similarity_score": getattr(n, "score", 0),  "relevance_score": 1 - i * 0.1, 
-            "snippet": n.node.get_content()[:300] + "..." })
+                snippets.append({ "file": fname, "similarity_score": getattr(n, "score", 0),  "relevance_score": 1 - i * 0.1, 
+                                  "snippet": n.node.get_content()[:300] + "..." })
 
         return response.response, sources, snippets
 
