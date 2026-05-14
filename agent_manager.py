@@ -1,4 +1,3 @@
-
 from llama_index.core.agent import ReActAgent
 from llama_index.core.tools import FunctionTool
 from llama_index.llms.openai import OpenAI
@@ -7,10 +6,7 @@ from rag_pipelineg import MyRagSystem   # Import my existing class
 
 class AssistantAgent:
     def __init__(self, rag_instance):
-        from llama_index.core.agent import ReActAgent
-        from llama_index.core.tools import FunctionTool
-        from llama_index.llms.openai import OpenAI
-        import streamlit as st
+
         from rag_pipelineg import MyRagSystem   # Import my existing class
         # 1. Initialize your existing stable RAG
         self.rag_system = rag_instance  # Use the existing RAG instance passed from Streamlit session state
@@ -74,3 +70,4 @@ class AssistantAgent:
         
         #return response.response, sources, snippets
         return str(response), sources, snippets
+## --------------------------- 00 --------------------------- ##

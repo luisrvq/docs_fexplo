@@ -526,3 +526,4 @@ if prompt := st.chat_input("Ask something about your documents"):
                     
                         st.divider() # Optional: adds a small line between different sources
     st.session_state.messages.append({ "role": "assistant", "content": answer, "sources": sources, "snippets": snippets })
+## --------------------------- 00 --------------------------- ##
