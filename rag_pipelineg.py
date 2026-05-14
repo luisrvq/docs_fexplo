@@ -17,10 +17,12 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.core.memory import ChatMemoryBuffer
 from llama_index.llms.openai import OpenAI
-from llama_index.core.chat_engine import CondensePlusContextChatEngine, ContextChatEngine
 from llama_index.core.schema import QueryBundle
+from llama_index.core.vector_stores import MetadataFilters, ExactMatchFilter
+from llama_index.core.node_parser import SentenceSplitter
 from llama_index.postprocessor.rankgpt_rerank import RankGPTRerank
 from llama_index.readers.file import DocxReader
+from llama_index.readers.file import PyMuPDFReader
 
 from networkx import nodes
 from openai import OpenAI as OpenAIVision
@@ -34,6 +36,7 @@ load_dotenv()
 
 Settings.llm = OpenAI(model="gpt-4o-mini")
 Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
+Settings.text_splitter = SentenceSplitter( chunk_size=300, chunk_overlap=40 )
 
 class MyRagSystem:
     def __init__(self, session_id: str):
@@ -56,7 +59,7 @@ class MyRagSystem:
 
         # Memory
         self.memory = ChatMemoryBuffer.from_defaults(token_limit=3000)
-
+        
         # Index
         if self.collection.count() > 0:
             self.index = VectorStoreIndex.from_vector_store(self.vector_store)
@@ -74,7 +77,7 @@ class MyRagSystem:
 
         image_data_url = f"data:image/png;base64,{b64_image}"
 
-        response = client.responses.create( model="gpt-4.1-mini",
+        response = client.responses.create( model="gpt-4o-mini",
         input=[ {  "role": "user",
                    "content": [
                     {"type": "input_text", "text": "Extract all useful information from this image."},
@@ -83,24 +86,83 @@ class MyRagSystem:
         return response.output_text
 
     # -----------------------------
+    # Query Classification
+    # -----------------------------    
+    def classify_query(self, question: str):
+        q = question.lower()
+        # LIST / FIND DOCUMENT
+        if any(x in q for x in ["list", "which documents", "find documents", "show documents", "documents contain",
+                                "documents mention", "what documents", "make a bullet list"]):
+            return "retrieval_list"
+        elif any(x in q for x in ["compare", "difference", "versus", "vs", "compare and contrast", "similarities", "differences"]):  
+            return "comparison"
+        elif any(x in q for x in ["summarize", "summary", "overview" ]):
+            return "summary"
+        elif any(x in q for x in ["image", "picture", "photo", "diagram", "visual"]):
+            return "image_query"
+        # DEFAULT
+        return "conversational"
+
+    # -------------------------------------------
+    # Define Prompt Templates for each query type
+    # -------------------------------------------  
+    def define_prompt(self, query_type: str):
+        if query_type == "retrieval_list":
+            system_prompt = """You are a document retrieval assistant.
+                                Return ONLY the matching document names.
+                                Use concise bullet points.
+                                Do not invent documents.
+                                Only mention documents present in the retrieved context.  """
+
+        elif query_type == "comparison":
+            system_prompt = """You are a comparison assistant.
+                               Compare the retrieved documents clearly.
+                               Highlight similarities and differences. """
+
+        elif query_type == "summary":
+            system_prompt = """You are a summarization assistant.
+                                Create concise summaries from the retrieved content."""
+        elif query_type == "image_query":
+            system_prompt = """You are an image analysis assistant.
+                                Focus on visual content extracted from images."""
+        else:
+            system_prompt = """You are a helpful assistant.
+                            Use the provided context to answer accurately."""
+        return system_prompt
+
+    # -----------------------------
     # ASK
     # -----------------------------
-    def ask(self, question, required_words="", mode="Match All", min_score=0.15, reset_memory=True):
+    def ask(self, question, required_words="", mode="Match All", min_score=0.15):
         from llama_index.core.query_engine import RetrieverQueryEngine
         from llama_index.core.chat_engine import CondensePlusContextChatEngine
         from llama_index.core.postprocessor import SimilarityPostprocessor
         from llama_index.postprocessor.rankgpt_rerank import RankGPTRerank
-        from llama_index.llms.openai import OpenAI    
+        from llama_index.llms.openai import OpenAI  
 
-        # IMPORTANT: If you are using CondensePlusContext, 
-        # sometimes the internal buffer needs a fresh start
-        # 1. Reset memory if "Fresh Search" is checked in Streamlit
-        if reset_memory:
-            self.memory.reset()
-            print("Log: Memory has been wiped for a fresh start.")
+        # Detect Query Type
+        query_type = self.classify_query(question)
+        print(f"Detected query type: {query_type}")  
 
-        # 2. Define the Base Retriever
-        base_retriever = self.index.as_retriever(similarity_top_k=10)
+        metadata_filters = None
+        if "faq" not in question.lower():
+            metadata_filters = MetadataFilters( filters=[ ExactMatchFilter( key="type", value="user_upload" ) ] )
+            
+        # Spreadsheet-focused retrieval
+        if query_type == "spreadsheet_query":
+            metadata_filters = MetadataFilters( filters=[ ExactMatchFilter( key="data_type", value="structured_table" ) ] )
+            print("Spreadsheet filter activated")
+
+        # 2. Define the Base Retriever (Dynamic Retrieval Strategy)
+        if query_type == "retrieval_list":         top_k = 20
+        elif query_type == "comparison":           top_k = 12
+        elif query_type == "summary":              top_k = 8
+        elif query_type == "image_query":          top_k = 6
+        else:                                      top_k = 10
+        base_retriever = self.index.as_retriever(similarity_top_k=top_k, filters=metadata_filters)
+        print(type(metadata_filters))
+        print(metadata_filters)
+        print(f"Using top_k = {top_k}")
 
         # 3. Prepare Post-Processors (Filters + Reranker)
         postprocessors = [SimilarityPostprocessor(similarity_cutoff=min_score)]
@@ -108,7 +170,7 @@ class MyRagSystem:
         # We will apply it to the final response nodes below.
     
         # LLM Reranker (Top 3)
-        reranker = RankGPTRerank(llm=OpenAI(model="gpt-4o-mini"), top_n=3)
+        reranker = RankGPTRerank(llm=OpenAI(model="gpt-4o-mini"), top_n=7)
         postprocessors.append(reranker)
 
         # 4. Build the Query Engine (Fixed Initialization)
@@ -116,19 +178,20 @@ class MyRagSystem:
         query_engine = RetrieverQueryEngine.from_args( retriever=base_retriever, node_postprocessors=postprocessors,
                         response_mode="compact"  )
 
-        # 5. Build the Chat Engine
-        # This automatically rephrases follow-up questions using conversation history
-        chat_engine = CondensePlusContextChatEngine.from_defaults( 
-                        query_engine=query_engine, 
-                        retriever=base_retriever, 
-                        memory=self.memory,
-                        system_prompt="You are a helpful assistant. Use the provided context to answer accurately."  )
-        # 6. Get response
-        response = chat_engine.chat(question)
+        # 5. Get response
+        response = query_engine.query(question)
 
         # 7. Extract nodes for your UI sources (using nodes from the response)
         # This ensures your "Sources & Evidence" match what the AI actually used
         final_nodes = response.source_nodes[:10]  # Extract only the 3 top documents
+        # 8. Temporary for debugging: print out the retrieved nodes and their metadata to verify what's being processed
+        print("\n===== RETRIEVED NODES =====")
+        for i, n in enumerate(response.source_nodes[:5]): # Print top 5 for debugging
+            print(f"\nNODE {i}")
+            print(f"Score: {n.score}")
+            print(f"Metadata: {n.node.metadata}")
+            print(n.node.get_content()[:500])
+
         snippets = []
         sources = []
         seen = set()
@@ -151,16 +214,31 @@ class MyRagSystem:
                 snippets.append({ "file": fname, "similarity_score": getattr(n, "score", 0),  "relevance_score": 1 - i * 0.1, 
                                   "snippet": n.node.get_content()[:300] + "..." })
 
-        return response.response, sources, snippets
+        self.last_sources = sources   # To make sure those sources actually show up in your UI
+        self.last_snippets = snippets
+        
+        ##return response.response, sources, snippets
+        return str(response), sources, snippets
 
     # -----------------------------
     # INGEST FILE
     # -----------------------------
     def ingest_file(self, path: str):
-        loader = SimpleDirectoryReader(input_files=[path])
-        docs = loader.load_data()
+        if path.lower().endswith(".pdf"):
+            loader = PyMuPDFReader()
+            docs = loader.load_data(file_path=path)
+        else:
+            loader = SimpleDirectoryReader(input_files=[path])
+            docs = loader.load_data()   
+        
+        print(f"Loaded {len(docs)} docs from {path}")  # Only for debugging, can be removed in production
+        for i, d in enumerate(docs):                   # Only for debugging, can be removed in production
+            print(f"\n--- DOC {i} CONTENT PREVIEW ---")
+            print(d.text[:1000])
 
         for d in docs:
+            d.metadata["file_name"] = os.path.basename(path)
+            d.metadata["type"] = "user_upload"
             self.index.insert(d)
 
     # -----------------------------
@@ -169,8 +247,7 @@ class MyRagSystem:
     def ingest_image(self, path: str):
         text = self.extract_text_from_image(path)
 
-        doc = Document( text=text,  metadata={"file_name": os.path.basename(path)} )
-
+        doc = Document( text=text,  metadata={"file_name": os.path.basename(path), "type": "user_upload"} )
         self.index.insert(doc)
 
     # -----------------------------
@@ -179,18 +256,15 @@ class MyRagSystem:
     def load_excel_all_sheets(self, path, filename):
         from llama_index.core import Document
         import pandas as pd
-
         excel = pd.ExcelFile(path)
         documents = []
-        
         for sheet_name in excel.sheet_names: 
             df = excel.parse(sheet_name) 
-            ##text = df.to_string(index=False)
-            ##doc = Document( text=text, 
-            ##                metadata={ "filename": filename,  "sheet": sheet_name  } )
+            
             markdown_table = df.to_markdown(index=False)    # Convert the entire sheet to a Markdown table
             content = f"### Sheet: {sheet_name}\n\n{markdown_table}"  # wrap the table in a clear header so the AI knows which sheet it is reading
-            doc = Document( text=content, metadata={ "file_name": filename, "sheet_name": sheet_name, "data_type": "structured_table" }  ) 
+            doc = Document( text=content, metadata={ "file_name": filename, "sheet_name": sheet_name, 
+                                                    "data_type": "structured_table", "source_type": "excel", "type": "user_upload" } ) 
             documents.append(doc)
 
         return documents
@@ -285,4 +359,5 @@ class MyRagSystem:
                                     "type": "official_faq"  }  )
                 faq_documents.append(doc)
         return faq_documents
+
 ## --------------000000------------------ ##

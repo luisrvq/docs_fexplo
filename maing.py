@@ -4,6 +4,7 @@ import os
 import subprocess
 import platform
 import uuid     # Get user session_id for unique file keys
+from agent_manager import AssistantAgent  # Import the Agent manager class
 
 # ----------------------------------------------
 # First visit → create session_id → store in URL  
@@ -37,19 +38,25 @@ data_path = f"data/{st.session_state.session_id}"
 db_path = f"storage/{st.session_state.session_id}"
 collection_name = f"documents_{st.session_state.session_id}"
 
+# 1. First, keep your RAG initialization as is
 if "rag" not in st.session_state:
     st.session_state.rag = rag.MyRagSystem(st.session_state.session_id)
 rag_system = st.session_state.rag
 print(f"RAG system initialized for session_id: {st.session_state.session_id}")
 
-# for FAQs
+# 2. NEW: Initialize the Agent Manager right after the RAG system
+if "agent" not in st.session_state:
+    st.session_state.agent = AssistantAgent(rag_system)  # We pass the existing rag_system instance to the agent
+assistant_agent = st.session_state.agent
+print(f"Agent system initialized for session_id: {st.session_state.session_id}")
+
+# 3. Keep your FAQ logic (it still uses the rag_system directly for ingestion)
 # Get the directory where your script is running
 if "faqs_loaded" not in st.session_state:
     base_dir = os.path.dirname(os.path.abspath(__file__))
     faq_path = os.path.join(base_dir, "faqs_maing.json")
     faq_docs = rag_system.load_faqs(faq_path) # Load FAQs from a JSON file
-    # Add these to your current index alongside your other documents
-    rag_system.index.insert_nodes(faq_docs)
+    rag_system.index.insert_nodes(faq_docs)   # Add FAQs to your current index alongside your other documents
     st.session_state.faqs_loaded = True
 
 # ----------------------------------------------
@@ -91,6 +98,11 @@ def reveal_in_explorer(file_path):
     else: # Linux
         subprocess.run(["xdg-open", os.path.dirname(file_path)])
 
+def initialize_session(session_id):
+    st.session_state.session_id = session_id
+    st.session_state.rag = rag.MyRagSystem(session_id)
+    st.session_state.agent = AssistantAgent( st.session_state.rag  )   # Re-initialize the agent with the new RAG system
+    st.session_state.messages = []
 
 # -----------------------------
 # Title of Chat pannel
@@ -139,12 +151,14 @@ with st.sidebar:
     # Handle actions
     if open_clicked:
         if new_session_id:
-            st.query_params["session_id"] = new_session_id
-            st.session_state.session_id = new_session_id
             st.session_state.switch_session_input = ""
-            st.session_state.messages = [] # Wipes the UI chat hiostory
+            st.query_params["session_id"] = new_session_id
+            initialize_session(new_session_id)  # converted as a 
+            ##st.session_state.session_id = new_session_id
+            ##st.session_state.messages = [] # Wipes the UI chat hiostory
             rag_system.reset_memory()
-            st.session_state.rag = rag.MyRagSystem(new_session_id)
+            ##st.session_state.rag = rag.MyRagSystem(new_session_id)
+            ##st.session_state.agent = AssistantAgent(st.session_state.rag)   # Re-initialize the agent with the new RAG system
             st.rerun()
         else:
             st.warning("Enter a session ID")
@@ -158,8 +172,11 @@ with st.sidebar:
         new_id = str(uuid.uuid4())[:8]
         st.session_state.clear()   # Optional: clear chat memory
         st.query_params["session_id"] = new_id
-        st.session_state.session_id = new_id
-        st.session_state.messages = [] # Wipes the UI chat hiostory
+        initialize_session(new_id)
+        ##st.session_state.session_id = new_id
+        ##st.session_state.rag = rag.MyRagSystem(new_id)
+        ##st.session_state.agent = AssistantAgent(st.session_state.rag)
+        ##st.session_state.messages = [] # Wipes the UI chat hiostory
         rag_system.reset_memory()
         st.rerun()
 
@@ -378,7 +395,7 @@ with st.sidebar:
     
     ## Retrieval settings
     st.sidebar.header("🔍 Retrieval Settings")
-    min_score = st.sidebar.slider( "Minimum similarity score", min_value=0.0,  max_value=1.0, value=0.2, step=0.01, key="min_score_key" )
+    min_score = st.sidebar.slider( "Minimum similarity score", min_value=0.0,  max_value=1.0, value=0.20, step=0.01, key="min_score_key" )
 
     # THE CLEAR BUTTON: It calls our reset function when clicked
     st.button("Clear All Filters", on_click=clear_all_filters, use_container_width=True)
@@ -480,9 +497,11 @@ if prompt := st.chat_input("Ask something about your documents"):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
 
-            answer, sources, snippets = rag_system.ask( prompt, required_words=keywordsx, 
-                                                       mode=match_mode, min_score=min_score, reset_memory = fresh_search )
-
+            ## answer, sources, snippets = rag_system.ask( prompt, required_words=keywordsx, 
+            ##                                           mode=match_mode, min_score=min_score, reset_memory = fresh_search )
+            # NEW: use the Agent manager to handle the query and get the response + sources
+            answer, sources, snippets = assistant_agent.handle_query(prompt) 
+            
             if sources:
                 st.session_state["last_source"] = sources[0][0]  # NEW: store top document
 
