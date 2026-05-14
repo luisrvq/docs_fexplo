@@ -59,14 +59,26 @@ class AssistantAgent:
             verbose=True  )
 
     def handle_query(self, user_input):
-        # This is the single entry point for your Streamlit UI
-        response = self.agent.chat(user_input)
-        
+        try:
+            # This is the single entry point for your Streamlit UI
+            response = self.agent.chat(user_input)
+            output_text = response.response
+        except Exception as e:
+            # 🛡️ Fallback: If gpt-3.5 reasoning layer fails, bypass agent 
+            # and query your stable RAG directly so the user gets an answer!
+            print(f"Agent Reasoning Loop Failed: {str(e)}. Routing to direct RAG.")
+            output_text, _, _ = self.rag_system.ask(
+                user_input,
+                required_words=st.session_state.get("keywords", ""),
+                mode=st.session_state.get("match_mode", "Match All"),
+                min_score=st.session_state.get("min_score", 0.15),
+                reset_memory=False  )
+
         # Access the RAG's metadata for your UI sources
         # (This pulls from the tool's execution history)
         sources = getattr(self.rag_system, 'last_sources', []) 
         snippets = getattr(self.rag_system, 'last_snippets', [])
         
         #return response.response, sources, snippets
-        return str(response), sources, snippets
+        return output_text, sources, snippets
 ## --------------------------- 00 --------------------------- ##
