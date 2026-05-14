@@ -170,8 +170,8 @@ class MyRagSystem:
         # Keyword Filter logic remains manual because it depends on user input strings
         # We will apply it to the final response nodes below.
     
-        # LLM Reranker (Top 3)
-        reranker = RankGPTRerank(llm=OpenAI(model="gpt-4o-mini"), top_n=7)
+        # LLM Reranker (Top 7)
+        reranker = RankGPTRerank(llm=OpenAI(model="gpt-3.5-turbo-0125"), top_n=7)
         postprocessors.append(reranker)
 
         # 4. Build the Query Engine (Fixed Initialization)

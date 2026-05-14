@@ -51,11 +51,10 @@ class AssistantAgent:
                             """  )
         
         # 3. Initialize the Agent with the tool(s)
-        # We use gpt-4o because it's better at "ReAct" reasoning
-        ##self.agent = ReActAgent.from_tools(
+        # We use gpt-4-turbo-preview because it's better at "ReAct" reasoning
         self.agent = ReActAgent(
             tools=[self.rag_tool], 
-            llm=OpenAI(model="gpt-4o"),
+            llm=OpenAI(model="gpt-4-turbo-preview"),
             memory=self.rag_system.memory,
             verbose=True  )
 
