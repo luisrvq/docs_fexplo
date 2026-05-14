@@ -1,6 +1,9 @@
 # Web Framework
 streamlit==1.32.2
 
+# Force HTTP Engine Compatibility (CRITICAL FIX)
+httpx==0.27.2
+
 # LlamaIndex Core & Conversational Memory
 llama-index==0.10.20
 llama-index-core==0.10.20
