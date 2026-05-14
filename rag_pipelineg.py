@@ -217,7 +217,6 @@ class MyRagSystem:
         self.last_sources = sources   # To make sure those sources actually show up in your UI
         self.last_snippets = snippets
         
-        ##return response.response, sources, snippets
         return str(response), sources, snippets
 
     # -----------------------------
@@ -275,8 +274,6 @@ class MyRagSystem:
     # -----------------------------
     def get_stats(self):
         metas = self.collection.get().get("metadatas", [])
-        ##docs = len(set(m.get("file_name") for m in metas if m)) if metas else 0
-        ##return { "chunks": self.collection.count(),  "documents": docs }
         user_docs = set()  # User uploaded documents only
         faq_docs = set()   # FAQ documents
         for m in metas:
