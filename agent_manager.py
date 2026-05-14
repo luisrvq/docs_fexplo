@@ -24,7 +24,6 @@ class AssistantAgent:
                 required_words=st.session_state.get("keyword_filter_key", ""),
                 mode=st.session_state.get("logic_mode_key", "Match All"),
                 min_score=st.session_state.get("min_score_key", 0.15),  )
-                ##reset_memory=False # Let the Agent handle memory 
 
             self.rag_system.last_sources = sources   # Store sources for UI
             self.rag_system.last_snippets = snippets
@@ -73,4 +72,5 @@ class AssistantAgent:
         sources = getattr(self.rag_system, 'last_sources', []) 
         snippets = getattr(self.rag_system, 'last_snippets', [])
         
-        return response.response, sources, snippets
+        #return response.response, sources, snippets
+        return str(response), sources, snippets
