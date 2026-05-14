@@ -54,7 +54,7 @@ class AssistantAgent:
         # We use gpt-4-turbo-preview because it's better at "ReAct" reasoning
         self.agent = ReActAgent(
             tools=[self.rag_tool], 
-            llm=OpenAI(model="gpt-4-turbo-preview"),
+            llm=OpenAI(model="gpt-3.5-turbo"),
             memory=self.rag_system.memory,
             verbose=True  )
 

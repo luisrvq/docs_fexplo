@@ -35,7 +35,7 @@ load_dotenv()
 # LLM / Embeddings (global config OK)
 # -----------------------------
 
-Settings.llm = OpenAI(model="gpt-4o-mini")
+Settings.llm = OpenAI(model="gpt-3.5-turbo")
 Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
 Settings.text_splitter = SentenceSplitter( chunk_size=300, chunk_overlap=40 )
 
@@ -78,7 +78,7 @@ class MyRagSystem:
 
         image_data_url = f"data:image/png;base64,{b64_image}"
 
-        response = client.responses.create( model="gpt-4o-mini",
+        response = client.responses.create( model="gpt-3.5-turbo",
         input=[ {  "role": "user",
                    "content": [
                     {"type": "input_text", "text": "Extract all useful information from this image."},
@@ -171,7 +171,7 @@ class MyRagSystem:
         # We will apply it to the final response nodes below.
     
         # LLM Reranker (Top 7)
-        reranker = RankGPTRerank(llm=OpenAI(model="gpt-3.5-turbo-0125"), top_n=7)
+        reranker = RankGPTRerank(llm=OpenAI(model="gpt-3.5-turbo"), top_n=7)
         postprocessors.append(reranker)
 
         # 4. Build the Query Engine (Fixed Initialization)
