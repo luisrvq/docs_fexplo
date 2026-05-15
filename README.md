@@ -1,75 +1,345 @@
-# 🧠 AI Personal Assistant (Multimodal)
+# 🧠 AI Personal Assistant (Agentic Multimodal RAG)
 
-An enterprise-grade **Retrieval-Augmented Generation (RAG)** application designed to search, understand, and reason over your private documents.
-Unlike basic RAG setups, this assistant uses a multi-stage retrieval pipeline with 
-**RankGPT reranking** and **contex-awarel query condensation** to ensure highly accurate, conversational answers.
+An enterprise-grade **Agentic Retrieval-Augmented Generation (RAG)** platform designed to search, understand, reason over, and organize private documents using advanced AI orchestration.
 
-👉 sreamlit badge:  
+Unlike traditional RAG chatbots, this assistant combines:
+
+- 🧩 Multi-tool Agentic workflows
+- 🔍 Multi-stage retrieval pipelines
+- 🧠 Conversational memory
+- 📄 Metadata-aware document discovery
+- 🎯 RankGPT reranking
+- 🖼️ Multimodal document ingestion
+- 📚 Explainable AI evidence tracing
+
+The result is a highly accurate and context-aware AI assistant capable of handling complex enterprise document workflows.
+
+---
+
+## 🚀 Live Demo
+
+👉 Streamlit App:  
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://maingpy-6tg79pvqkn8plxpn7lsxsc.streamlit.app)
 
-👉 Live Demo:  
+Direct Link:  
 https://maingpy-6tg79pvqkn8plxpn7lsxsc.streamlit.app
----
-
-## 🌟 Key Features
-
-*   **Multimodal Ingestion**: Seamlessly indexes PDFs, DOCX, TXT, and **Images** (via OpenAI Vision OCR).
-*   **Advanced Retrieval Pipeline**:
-    *   **Stage 1**: Semantic Vector Search.
-    *   **Stage 2**: Metadata & Keyword Filtering (Hard-match constraints).
-    *   **Stage 3**: **RankGPT Reranking** (Uses LLMs to re-order the top results for maximum relevance).
-*   **Stateful Conversational Memory**: Uses `CondensePlusContext` logic to handle complex follow-up questions (e.g., "Summarize    *that* document").
-*   **Explainable AI (XAI)**: Provides a "Sources & Evidence" panel with similarity scores and snippet previews for every claim made.
-*   **FAQ Integration**: Supports a vetted `faqs.json` for instant, authoritative answers to common queries.
 
 ---
 
-## 🏗️ The Pipeline Architecture
+# 🌟 Core Features
+
+## 📄 Multimodal Document Ingestion
+
+Supports:
+
+- PDF
+- DOCX
+- TXT
+- XLSX
+- CSV
+- Images (OCR via OpenAI Vision)
+
+Documents are automatically:
+- parsed
+- chunked
+- embedded
+- indexed into ChromaDB
+
+---
+
+## 🧠 Agentic RAG Architecture
+
+The platform uses a **ReAct Agent** capable of selecting specialized tools dynamically based on user intent.
+
+### Available Agent Tools
+
+| Tool | Purpose |
+|------|---------|
+| `document_search` | Semantic question answering |
+| `document_catalog_search` | Metadata & filename discovery |
+
+This enables:
+- semantic QA
+- document title retrieval
+- metadata search
+- conversational workflows
+- intent-aware retrieval
+
+---
+
+## 🔍 Multi-Stage Retrieval Pipeline
+
+### Stage 1 — Semantic Vector Retrieval
+- OpenAI embeddings
+- ChromaDB similarity search
+
+### Stage 2 — Metadata & Keyword Filtering
+Supports:
+- Match Any
+- Match All
+- hard keyword constraints
+
+### Stage 3 — RankGPT Reranking
+LLM-powered reranking improves relevance before synthesis.
+
+### Stage 4 — LLM Synthesis
+The final answer is generated using conversational context and reranked evidence.
+
+---
+
+## 🧠 Conversational Memory
+
+Supports:
+- multi-turn conversations
+- follow-up questions
+- contextual references
+- session-isolated memory
+
+Example:
+> “Summarize that spreadsheet”
+> “Now compare it with the previous document”
+
+---
+
+## 📚 Explainable AI (XAI)
+
+Every answer includes:
+- similarity scores
+- relevance scores
+- evidence snippets
+- source tracking
+
+This improves:
+- transparency
+- trustworthiness
+- debugging
+- enterprise auditability
+
+---
+
+## 📂 Session-Aware Architecture
+
+Each session maintains:
+- isolated vector collections
+- independent memory
+- separate uploaded documents
+
+Supports:
+- switching between sessions
+- persistent retrieval
+- cloud-safe state management
+
+---
+
+# 🏗️ Architecture Overview
 
 ```text
-User Input → Query Condenser (History Aware) → Vector Search (Top 10) 
-     ↓
-Similarity Filter (min_score) → Keyword Hard-Filter 
-     ↓
-RankGPT Reranker (Top 3) → LLM Synthesis → Final Answer + Citations
+User Query
+    ↓
+ReAct Agent
+    ↓
+Tool Selection
+    ├── document_search
+    └── document_catalog_search
+            ↓
+Multi-Stage Retrieval Pipeline
+    ↓
+Vector Search (ChromaDB)
+    ↓
+Keyword + Metadata Filtering
+    ↓
+RankGPT Reranking
+    ↓
+LLM Synthesis
+    ↓
+Final Answer + Sources + Evidence
 ```
 
 ---
 
-## 🛠️ Tech Stack
+# 🛠️ Technology Stack
 
-*   **Framework**: [LlamaIndex](https://llamaindex.ai) (Data Orchestration)
-*   **Frontend**: [Streamlit](https://streamlit.io/)
-*   **Models**: OpenAI GPT-4o (Reasoning), GPT-4o-mini (Reranking/Vision), Text-Embedding-3-Small
-*   **Vector Store**: ChromaDB / SimpleVectorStore
-*   **Language**: Python
+| Layer | Technology |
+|------|-------------|
+| Frontend | Streamlit |
+| Orchestration | LlamaIndex |
+| Agent Framework | ReActAgent |
+| LLM Provider | OpenAI |
+| Vector Database | ChromaDB |
+| OCR / Vision | OpenAI Vision |
+| Embeddings | text-embedding-3-small |
+| Language | Python |
 
 ---
 
-## 🚀 Quick Start
+# 🤖 Models Used
 
-### 1. Clone & Setup
+| Purpose | Model |
+|---------|------|
+| Agent Reasoning | GPT-3.5-Turbo |
+| Retrieval Synthesis | GPT-4-Turbo |
+| OCR / Vision | GPT-4o-mini |
+| Embeddings | text-embedding-3-small |
+| Reranking | RankGPT |
+
+---
+
+# 🚀 Quick Start
+
+## 1️⃣ Clone Repository
 
 ```bash
 git clone https://github.com/luisrvq/docs_fexplo.git
 cd docs_fexplo
+```
+
+---
+
+## 2️⃣ Create Virtual Environment
+
+### Mac / Linux
+
+```bash
 python -m venv venv
-source venv/bin/activate  # Mac/Linux
-# venv\Scripts\activate   # Windows
+source venv/bin/activate
+```
+
+### Windows
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
+
+---
+
+## 3️⃣ Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configuration
-Create a `.env` file in the root directory:
+---
+
+## 4️⃣ Configure Environment Variables
+
+Create a `.env` file:
+
 ```env
 OPENAI_API_KEY=your_api_key_here
 ```
+
 ---
 
-## ▶️ Run the app locally
+# ▶️ Run Locally
 
 ```bash
 streamlit run maing.py
+```
+
+---
+
+# ☁️ Streamlit Cloud Deployment
+
+## 1️⃣ Push Code to GitHub
+
+## 2️⃣ Open Streamlit Community Cloud
+
+https://streamlit.io/cloud
+
+## 3️⃣ Create New App
+
+Set:
+
+```text
+Main file:
+maing.py
+```
+
+---
+
+## 4️⃣ Add Secrets
+
+```toml
+OPENAI_API_KEY = "your_api_key_here"
+```
+
+---
+
+## 5️⃣ Deploy 🚀
+
+---
+
+# 📁 Project Structure
+
+```text
+.
+├── data/                      # Uploaded runtime documents
+├── storage/                   # Persistent vector storage
+├── maing.py                   # Streamlit UI + session management
+├── agent_manager.py           # Agent orchestration & tools
+├── rag_pipelineg.py           # Core RAG pipeline
+├── requirements.txt
+├── faqs_maing.json            # FAQ retrieval source
+├── README.md
+└── assets/
+    ├── maing_sidebar.png
+    └── maing_chat.png
+```
+
+---
+
+# 🔍 Retrieval Features
+
+✅ Semantic Search  
+✅ Metadata Filtering  
+✅ Hard Keyword Constraints  
+✅ RankGPT Reranking  
+✅ Multi-Document Retrieval  
+✅ Session-Isolated Retrieval  
+✅ Explainable Evidence Tracking  
+
+---
+
+# 📸 Screenshots
+
+## Sidebar & Controls
+
+![Sidebar](assets/maing_sidebar.png)
+
+---
+
+## Chat & Evidence
+
+![Chat](assets/maing_chat.png)
+
+---
+
+# ⚠️ Notes
+
+- Local desktop features may not work in cloud environments
+- Very large files may increase ingestion time
+- OCR quality depends on source image quality
+- Streamlit Cloud storage is ephemeral
+
+---
+
+# 🔮 Future Roadmap
+
+- [ ] Local LLM Support (Ollama)
+- [ ] Spreadsheet-Specific Agent
+
+---
+
+# 👤 Author
+
+Luis Solis Vasquez
+
+---
+
+# ⭐ Support the Project
+
+If you found this project useful, please consider giving it a ⭐ on GitHub.
 ```
 
 ---

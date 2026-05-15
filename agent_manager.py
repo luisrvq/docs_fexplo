@@ -11,7 +11,9 @@ class AssistantAgent:
         # 1. Initialize your existing stable RAG
         self.rag_system = rag_instance  # Use the existing RAG instance passed from Streamlit session state
         
-        # Pull settings directly from Streamlit session state
+        # Define the function that will be wrapped as a tool for the Agent. 
+        # This function will call your RAG's ask() method.
+        #------------------------------------------------------------------ 
         def search_docs(query: str):
             """Search for information in uploaded documents and spreadsheets."""
             # Pull settings directly from Streamlit session state
@@ -23,11 +25,25 @@ class AssistantAgent:
 
             self.rag_system.last_sources = sources   # Store sources for UI
             self.rag_system.last_snippets = snippets
-
+            print("TOOL USED: document_search")
             return answer   # Return ONLY text to the Agent
         
-        # 2. Define the RAG as a Tool
+
+        # This is a separate tool that ONLY searches document titles and filenames, 
+        # which can be useful for certain queries that reference file names or ask "What documents do I have
+        #---------------------------------------------------------------------------------------------------
+        def search_document_titles(query: str):
+            """Search ONLY for matching document titles and filenames."""
+            result = self.rag_system.search_document_titles( query, 
+                                                        required_words=st.session_state.get( "keyword_filter_key", "" ), 
+                                                        mode=st.session_state.get( "logic_mode_key", "Match Any" ), 
+                                                        min_score=st.session_state.get( "min_score_key", 0.15 ) )
+            print("TOOL USED: document_catalog_search")
+            return result
+        
+        # 2a. Define the RAG as a Tool
         # This tells the Agent: "If you need facts from docs, call this."
+        #----------------------------------------------------------------
         self.rag_tool = FunctionTool.from_defaults(
             fn=search_docs,
             name="document_search",
@@ -36,8 +52,8 @@ class AssistantAgent:
 
                             Use this tool when:
                             - the user mentions uploaded files
-                            - the user references filenames
-                            - the user asks for summaries
+                            - the user asks about document contents
+                            - the user wants summaries
                             - the user asks for bullet lists
                             - the user asks about spreadsheets
                             - the user asks about PDFs or images
@@ -49,11 +65,39 @@ class AssistantAgent:
                             - OCR extracted images
                             - FAQs
                             """  )
-        
+        # 2b. Define a separate tool for searching document titles only. 
+        # This can help the Agent decide when to pull up file names vs. when to pull content.
+        #------------------------------------------------------------------------------------
+        self.catalog_tool = FunctionTool.from_defaults(
+            fn=search_document_titles,
+            name="document_catalog_search",
+            description="""
+            Use this tool when the user asks for:
+            - document titles
+            - filenames
+            - uploaded files
+            - resumes
+            - PDFs matching a topic
+            - job descriptions by category
+            - document lists
+
+            IMPORTANT:
+            This tool returns ONLY document names,
+            not document contents.
+
+            Use this tool for:
+            - "list documents"
+            - "find resumes"
+            - "show filenames"
+            - "documents about EnterpriseOne"
+            - "job description files"
+            """
+        )
+
         # 3. Initialize the Agent with the tool(s)
         # We use gpt-4-turbo-preview because it's better at "ReAct" reasoning
         self.agent = ReActAgent(
-            tools=[self.rag_tool], 
+            tools=[self.catalog_tool, self.rag_tool], 
             llm=OpenAI(model="gpt-3.5-turbo"),
             memory=self.rag_system.memory,
             verbose=True  )
@@ -69,8 +113,8 @@ class AssistantAgent:
             print(f"Agent Reasoning Loop Failed: {str(e)}. Routing to direct RAG.")
             output_text, _, _ = self.rag_system.ask(
                 user_input,
-                required_words=st.session_state.get("keywords", ""),
-                mode=st.session_state.get("match_mode", "Match All"),
+                required_words=st.session_state.get("keyword_filter_key", ""),
+                mode=st.session_state.get("logic_mode_key", "Match All"),
                 min_score=st.session_state.get("min_score", 0.15),
                 reset_memory=False  )
 

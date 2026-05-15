@@ -357,5 +357,38 @@ class MyRagSystem:
                                     "type": "official_faq"  }  )
                 faq_documents.append(doc)
         return faq_documents
+    
+    # --------------------------------------------------------
+    # Search Document Titles (with optional keyword filtering)
+    # --------------------------------------------------------
+    def search_document_titles(self, query, required_words="", mode="Match Any", min_score=0.20, top_k=30 ):
+    # Build metadata filters
+        metadata_filters = MetadataFilters( filters=[ ExactMatchFilter( key="type", value="user_upload" ) ] )
+        # Retriever
+        retriever = self.index.as_retriever( similarity_top_k=top_k, filters=metadata_filters )
+        # Retrieve nodes
+        nodes = retriever.retrieve(query)
+        # Filter by similarity
+        filtered_nodes = [ n for n in nodes if n.score and n.score >= min_score ]
+        # Extract unique filenames
+        unique_files = sorted(set( n.node.metadata.get("file_name", "Unknown") for n in filtered_nodes ))
+        # Optional keyword filtering
+        if required_words:
+            keywords = [ k.strip().lower() for k in required_words.split(",") ]
+            filtered_files = []
+            for f in unique_files:
+                f_lower = f.lower()
+                if mode == "Match All":
+                    if all(k in f_lower for k in keywords):
+                        filtered_files.append(f)
+                else:
+                    if any(k in f_lower for k in keywords):
+                        filtered_files.append(f)
+            unique_files = filtered_files
 
-## --------------------------- 00 --------------------------- ##
+        # Return formatted result
+        if not unique_files:
+            return "No matching documents found."
+        return "\n".join(
+            f"- {f}" for f in unique_files )
+## --------------------------- 000000000 --------------------------- ##
