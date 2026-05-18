@@ -223,9 +223,11 @@ with st.sidebar:
                     elif uploaded.type in ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
                                            "application/vnd.ms-excel" ]:  
                         # Excel ingestion (multiple sheets) 
+                        # 1) Store DataFrame for spreadsheet_search tool
+                        rag_system.load_spreadsheet_store(path, filename)
+                        # 2) Index sheets as markdown tables for vector search
                         excel_docs = rag_system.load_excel_all_sheets(path, filename) 
                         for doc in excel_docs:
-                            ##rag_system.ingest_file(path)
                             rag_system.index.insert(doc) # Directly insert each sheet
                     else:
                         rag_system.ingest_file(path)

@@ -1,11 +1,14 @@
 # rag_pipelineg.py
 #-----------------
-
+import re
+import numpy
 from csv import excel
+from importlib.resources import path
 from operator import index
 import os
 import shutil
 import base64
+import pandas as pd        # For Excel processing
 from unittest import loader
 from urllib import response
 from xmlrpc import client
@@ -42,6 +45,8 @@ Settings.text_splitter = SentenceSplitter( chunk_size=300, chunk_overlap=40 )
 class MyRagSystem:
     def __init__(self, session_id: str):
         self.session_id = session_id
+        self.spreadsheets = {}               # For Excel processing        
+        self.last_spreadsheet_results = []   # For Excel processing
 
         # Paths
         self.data_path = f"data/{session_id}"
@@ -224,9 +229,16 @@ class MyRagSystem:
     # INGEST FILE
     # -----------------------------
     def ingest_file(self, path: str):
+        file_name = os.path.basename(path)   # Get just the filename for metadata and storage 
+        ## PDF  
         if path.lower().endswith(".pdf"):
             loader = PyMuPDFReader()
             docs = loader.load_data(file_path=path)
+        ## DOCX
+        elif path.lower().endswith(".docx"):
+            loader = DocxReader()
+            docs = loader.load_data(file=path)
+        ## TXT, PNG, JPG, etc.
         else:
             loader = SimpleDirectoryReader(input_files=[path])
             docs = loader.load_data()   
@@ -391,4 +403,75 @@ class MyRagSystem:
             return "No matching documents found."
         return "\n".join(
             f"- {f}" for f in unique_files )
+    # ------------------------------------------------------------------------------------
+    # Load Excel/CSV into self.spreadsheets WITHOUT indexing (for spreadsheet_search tool)
+    # ------------------------------------------------------------------------------------
+    def load_spreadsheet_store(self, path: str, filename: str):
+        """Load Excel/CSV into self.spreadsheets WITHOUT indexing."""
+        try:
+            if path.lower().endswith(".csv"):
+                df = pd.read_csv(path)
+            else:
+                df = pd.read_excel(path)
+            self.spreadsheets[filename] = df
+            print(f"Spreadsheet stored (no indexing): {filename}")
+            print("Spreadsheet keys now:", list(self.spreadsheets.keys()))
+        except Exception as e:
+            print(f"Spreadsheet store failed: {e}")
+            raise
+
+    # --------------------------------------------------------------------------------
+    # Search Excel files (searching within the content of the sheets, not just titles)
+    # --------------------------------------------------------------------------------
+    def search_spreadsheets( self, query, max_rows=20 ):
+        query_lower = query.lower()
+        results = []
+        for file_name, df in self.spreadsheets.items():
+
+            try:
+                # Convert dataframe to string temporarily
+                mask = df.astype(str).apply( lambda col: col.str.lower().str.contains(query_lower, na=False ) )
+                matched_rows = df[mask.any(axis=1)]
+                if not matched_rows.empty:
+                    results.append({"file": file_name, "rows": matched_rows.head(max_rows) })
+            except Exception as e:
+                print(f"Spreadsheet search error in {file_name}: {e}")
+
+        self.last_spreadsheet_results = results
+
+        if not results:
+            return "No spreadsheet matches found."
+
+        final_output = []
+        for r in results:
+            final_output.append( f"\n📄 FILE: {r['file']}\n" )
+            final_output.append( r["rows"].to_string(index=False) )
+
+        return "\n\n".join(final_output)
+
+    # ----------------------------------------------------------------------------------------------
+    # This tool function the Agent will call when it wants to search numbers inside XLS or CSV files. 
+    # It includes keyword filtering and dynamic retrieval strategies based on query type.   
+    # ----------------------------------------------------------------------------------------------  
+    def parse_numeric_query(self, query):
+        query_lower = query.lower()
+        operator = None
+        if "above" in query_lower or "greater than" in query_lower:
+            operator = "gt"
+        elif "below" in query_lower or "less than" in query_lower:
+            operator = "lt"
+        numbers = re.findall(r'\\d+(?:\\.\\d+)?', query_lower)     # Extract numbers
+        if not numbers:
+            return None
+        value = float(numbers[0])
+        # Human normalization
+        if "million" in query_lower:
+            value *= 1_000_000
+        elif "k" in query_lower:
+            value *= 1_000
+
+        return {
+            "operator": operator,
+            "value": value }
+
 ## --------------------------- 000000000 --------------------------- ##
