@@ -42,13 +42,13 @@ collection_name = f"documents_{st.session_state.session_id}"
 if "rag" not in st.session_state:
     st.session_state.rag = rag.MyRagSystem(st.session_state.session_id)
 rag_system = st.session_state.rag
-print(f"RAG system initialized for session_id: {st.session_state.session_id}")
+print(f"rag_system initialized for session_id: {st.session_state.session_id}")
 
 # 2. NEW: Initialize the Agent Manager right after the RAG system
 if "agent" not in st.session_state:
     st.session_state.agent = AssistantAgent(rag_system)  # We pass the existing rag_system instance to the agent
 assistant_agent = st.session_state.agent
-print(f"Agent system initialized for session_id: {st.session_state.session_id}")
+print(f"assistant_agent initialized for session_id: {st.session_state.session_id}")
 
 # 3. Keep your FAQ logic (it still uses the rag_system directly for ingestion)
 # Get the directory where your script is running

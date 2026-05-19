@@ -7,6 +7,7 @@ from llama_index.core.tools import FunctionTool
 from llama_index.llms.openai import OpenAI
 import streamlit as st
 from rag_pipelineg import MyRagSystem   # Import my existing class
+from rag_pipelineg import MODEL_RETRIEVAL
 
 class AssistantAgent:
     def __init__(self, rag_instance):
@@ -191,7 +192,7 @@ class AssistantAgent:
             tools=[self.catalog_tool, 
                    self.rag_tool, 
                    self.spreadsheet_tool], 
-            llm=OpenAI(model="gpt-3.5-turbo"),
+            llm=OpenAI(model=MODEL_RETRIEVAL),
             memory=self.rag_system.memory,
             verbose=True  )
 

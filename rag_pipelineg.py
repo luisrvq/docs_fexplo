@@ -34,12 +34,22 @@ from sqlalchemy import text
 
 load_dotenv()
 
-# -----------------------------
-# LLM / Embeddings (global config OK)
-# -----------------------------
+# ---------------------------------------------------------------------------------------------
+# AI Models (global config) getting from TOML or .env 
+# is optional since you can also set them directly in the code, 
+# but it's a good practice to keep them in environment variables for security and flexibility.
+# ---------------------------------------------------------------------------------------------
+MODEL_REASONING  = os.getenv( "OPENAI_MODEL_REASONING", "gpt-4.1-mini" )  # More powerful model for reasoning tasks
+MODEL_EMBEDDINGS = os.getenv( "OPENAI_MODEL_EMBEDDINGS", "text-embedding-3-small" )  # More cost-effective embedding model
+MODEL_RETRIEVAL  = os.getenv( "OPENAI_MODEL_RETRIEVAL", "gpt-3.5-turbo" )  # More cost-effective model for retrieval tasks
+MODEL_IMAGING    = os.getenv( "OPENAI_MODEL_IMAGING", "gpt-4.1-mini" )  # Model for image analysis (if needed)
 
-Settings.llm = OpenAI(model="gpt-3.5-turbo")
-Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
+# -----------------------------------
+# LLM / Embeddings (global config OK)
+# -----------------------------------
+
+Settings.llm = OpenAI(model=MODEL_REASONING)
+Settings.embed_model = OpenAIEmbedding(model=MODEL_EMBEDDINGS)
 Settings.text_splitter = SentenceSplitter( chunk_size=300, chunk_overlap=40 )
 
 class MyRagSystem:
@@ -83,7 +93,7 @@ class MyRagSystem:
 
         image_data_url = f"data:image/png;base64,{b64_image}"
 
-        response = client.responses.create( model="gpt-3.5-turbo",
+        response = client.responses.create( model=MODEL_IMAGING,
         input=[ {  "role": "user",
                    "content": [
                     {"type": "input_text", "text": "Extract all useful information from this image."},
@@ -176,7 +186,7 @@ class MyRagSystem:
         # We will apply it to the final response nodes below.
     
         # LLM Reranker (Top 5)
-        reranker = RankGPTRerank(llm=OpenAI(model="gpt-3.5-turbo"), top_n=5)
+        reranker = RankGPTRerank(llm=OpenAI(model=MODEL_RETRIEVAL), top_n=5)
         postprocessors.append(reranker)
 
         # 4. Build the Query Engine (Fixed Initialization)
