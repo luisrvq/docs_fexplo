@@ -208,8 +208,8 @@ class AssistantAgent:
                 user_input,
                 required_words=st.session_state.get("keyword_filter_key", ""),
                 mode=st.session_state.get("logic_mode_key", "Match All"),
-                min_score=st.session_state.get("min_score", 0.15),
-                reset_memory=False  )
+                min_score=st.session_state.get("min_score", 0.15) )
+                #reset_memory=False  )
 
         # Access the RAG's metadata for your UI sources
         # (This pulls from the tool's execution history)

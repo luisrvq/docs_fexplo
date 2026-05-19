@@ -237,7 +237,7 @@ class MyRagSystem:
         ## DOCX
         elif path.lower().endswith(".docx"):
             loader = DocxReader()
-            docs = loader.load_data(file=path)
+            docs = loader.load_data(file=path)  # Load the DOCX file into documents
         ## TXT, PNG, JPG, etc.
         else:
             loader = SimpleDirectoryReader(input_files=[path])
