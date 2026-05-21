@@ -1,4 +1,4 @@
-# 🧠 AI Personal Assistant (Agentic Multimodal RAG)
+# 🧠 AI Personal Retrieval Assistant 
 
 An enterprise-grade **Agentic Retrieval-Augmented Generation (RAG)** platform designed to search, understand, reason over, and organize private documents using advanced AI orchestration.
 
@@ -19,14 +19,12 @@ The result is a highly accurate and context-aware AI assistant capable of handli
 ## 🚀 Live Demo
 
 👉 Streamlit App:  
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://maingpy-6tg79pvqkn8plxpn7lsxsc.streamlit.app)
-
 Direct Link:  
-https://maingpy-6tg79pvqkn8plxpn7lsxsc.streamlit.app
+https://docsfexplo-ogjdymmw9bgqb3slvkkvgn.streamlit.app/
 
 ---
 
-# 🌟 Core Features
+# 🌟 Platform Capabilities
 
 ## 📄 Multimodal Document Ingestion
 
@@ -53,10 +51,12 @@ The platform uses a **ReAct Agent** capable of selecting specialized tools dynam
 
 ### Available Agent Tools
 
-| Tool | Purpose |
-|------|---------|
-| `document_search` | Semantic question answering |
-| `document_catalog_search` | Metadata & filename discovery |
+|---------------------------|----------------------------------|
+| Tool                      | Purpose                          |
+|---------------------------|----------------------------------|
+| `document_search`         | Semantic question answering      |
+| `document_catalog_search` | Metadata & filename discovery    |
+| `spreadsheet_search`      | Structured spreadsheet reasoning |
 
 This enables:
 - semantic QA
@@ -66,6 +66,31 @@ This enables:
 - intent-aware retrieval
 
 ---
+
+## 🎯 Adaptive Retrieval Intelligence
+
+The assistant dynamically changes its retrieval strategy based on the user intent.
+Different query types automatically trigger different retrieval depths, reranking strategies, and filtering behaviors.
+
+### Retrieval Modes
+
+---------------------------------------------------------------
+| Query Type           | Retrieval Behavior                   |
+|----------------------|--------------------------------------|
+| Conversational QA    | Precision-focused semantic retrieval |
+| Document Discovery   | Broad exhaustive retrieval           |
+| Spreadsheet Queries  | Structured table reasoning           |
+| Summaries            | Context-compressed retrieval         |
+| Comparisons          | Multi-document semantic retrieval    |
+
+### Dynamic Optimizations
+
+- Adaptive `top_k` retrieval depth
+- Dynamic RankGPT reranking depth
+- Query intent classification
+- Metadata-aware filtering
+- Spreadsheet-specific retrieval
+- Context-aware conversational retrieval
 
 ## 🔍 Multi-Stage Retrieval Pipeline
 
@@ -99,6 +124,25 @@ Example:
 > “Summarize that spreadsheet”
 > “Now compare it with the previous document”
 
+## 📊 Spreadsheet Intelligence
+
+Unlike traditional RAG systems that flatten spreadsheets into plain text, this assistant includes a dedicated structured spreadsheet retrieval layer.
+
+### Supported Capabilities
+
+- Natural language querying over Excel files
+- Structured row retrieval
+- Price and numeric filtering
+- Apartment/property search
+- Table-aware reasoning
+- Spreadsheet metadata filtering
+
+### Example Queries
+
+- "Show apartments in Manhattan"
+- "List apartment prices above 1 million"
+- "Find rows containing JD Edwards"
+- "Show properties below 900k"
 ---
 
 ## 📚 Explainable AI (XAI)
@@ -131,28 +175,37 @@ Supports:
 
 ---
 
-# 🏗️ Architecture Overview
+# 🏗️ Adaptive Agentic Architecture
+
 
 ```text
 User Query
+    ↓
+Query Classification
     ↓
 ReAct Agent
     ↓
 Tool Selection
     ├── document_search
+    ├── spreadsheet_search
     └── document_catalog_search
             ↓
-Multi-Stage Retrieval Pipeline
+Adaptive Retrieval Pipeline
     ↓
-Vector Search (ChromaDB)
+Dynamic Retrieval Strategy
+    ├── Precision Retrieval
+    ├── Exhaustive Discovery
+    ├── Structured Table Search
     ↓
-Keyword + Metadata Filtering
+Metadata & Keyword Filtering
+    ↓
+Similarity Filtering
     ↓
 RankGPT Reranking
     ↓
 LLM Synthesis
     ↓
-Final Answer + Sources + Evidence
+Final Answer + Evidence
 ```
 
 ---
@@ -174,16 +227,38 @@ Final Answer + Sources + Evidence
 
 # 🤖 Models Used
 
-| Purpose | Model |
-|---------|------|
-| Agent Reasoning | GPT-3.5-Turbo |
-| Retrieval Synthesis | GPT-4-Turbo |
-| OCR / Vision | GPT-4o-mini |
-| Embeddings | text-embedding-3-small |
-| Reranking | RankGPT |
+| Purpose               | Model                  |
+|-----------------------|------------------------|
+| Agent Reasoning       | GPT-4.1-mini           |
+| Retrieval & Synthesis | GPT-4.1-mini           |
+| OCR / Fast Tasks      | GPT-4.1-nano           |
+| Embeddings            | text-embedding-3-small |
+| Reranking             | RankGPT                |
 
 ---
 
+# 🔍 Example Queries
+
+### 📄 Document Discovery
+
+- "List all JD Edwards job descriptions"
+- "Which files mention EnterpriseOne?"
+- "Show documents related to AS400"
+
+### 📊 Spreadsheet Analysis
+
+- "Show apartments in Manhattan"
+- "List apartment prices above 1 million"
+- "Find rows containing Foxter"
+
+### 🧠 Conversational QA
+
+- "Summarize the Johnson&Johnson job description"
+- "Compare the CNC responsibilities between documents"
+- "What JDE modules are required?"
+
+---
+ 
 # 🚀 Quick Start
 
 ## 1️⃣ Clone Repository
@@ -266,10 +341,6 @@ OPENAI_API_KEY = "your_api_key_here"
 
 ---
 
-## 5️⃣ Deploy 🚀
-
----
-
 # 📁 Project Structure
 
 ```text
@@ -326,8 +397,8 @@ OPENAI_API_KEY = "your_api_key_here"
 
 # 🔮 Future Roadmap
 
-- [ ] Local LLM Support (Ollama)
-- [ ] Spreadsheet-Specific Agent
+- [ ] Hybrid Search (BM25 + Vector Retrieval)
+- [ ] Workflow-based ReActAgent Migration
 
 ---
 
@@ -365,45 +436,11 @@ OPENAI_API_KEY = "your_api_key_here"
 
 ---
 
-## 📁 Project Structure
-
-```
-.
-├── app/                 # UI components, helpers
-├── data/                # Uploaded documents (runtime)
-├── .gitkeep
-├── maing.py             # Streamlit UI, session state management, and file handling
-├── rag_pipelineg.py     # The core RAG logic, custom retrievers, and reranking post-processors
-├── requirements.txt
-├── .gitignore
-├── faqs_maing.json      # Pre-vetted Q&A pairs for high-precision retrieval
-└── README.md
-```
-
----
-
-## ⚠️ Notes
-
-* “Open Folder” works only locally (desktop environment)
-* In cloud, files are available via **Download button**
-* Large files may impact performance
-
----
-
 ## 🔮 Future Improvements
 
 - [ ] **Hybrid Search**: Combining BM25 (keyword) with Vector search.
 - [ ] **Local LLM Support**: Integration with Ollama for privacy-focused queries.
 - [ ] **Streaming Responses**: For a more "ChatGPT-like" typing experience.
-
----
-## 📸 Screenshots
-
-### Sidebar & Controls
-![Sidebar](assets/maing_sidebar.png)
-
-### Chat & Sources
-![Chat](assets/maing_chat.png)
 
 ---
 

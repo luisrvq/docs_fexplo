@@ -120,21 +120,44 @@ st.markdown(
 # Sidebar Options
 # -----------------------------
 with st.sidebar:
-    ## Start new session buttonn
+    # -----------------------------
+    # SESSION TOOLBAR
+    # -----------------------------
     st.header("🔍 Session options")
-    session_id = st.session_state.session_id
-    # 1. Matching Header Card for Current Session
-    st.markdown(
-        f"""
-        <div style="background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(151,151,151,0.2); 
-                    border-radius: 8px; padding: 10px; margin-bottom: 15px; text-align: center;">
-            <p style="color: gray; font-size: 10px; margin: 0; text-transform: uppercase;">Active Session</p>
-            <p style="font-size: 16px; font-weight: bold; margin: 0; color: #55aaff;">{session_id}</p>
-        </div>
-        """, unsafe_allow_html=True  )
+    ##session_id = st.session_state.session_id
+    session_col1, session_col2 = st.columns([3, 1])
+    with session_col1:
+        st.markdown( f""" <div style="
+                            background-color: rgba(255,255,255,0.04);
+                            border: 1px solid rgba(151,151,151,0.2);
+                            border-radius: 8px;
+                            padding: 10px; text-align: center; ">
+                            <div style="
+                                font-size:10px; color:gray; text-transform:uppercase; margin-bottom:2px; ">
+                                Active Session </div>
+                            <div style=" font-size:18px; font-weight:bold; color:#55aaff; ">  {session_id} </div>
+                            </div> """,
+                            unsafe_allow_html=True  )
 
-    ## 2. Switch Session Section
-    st.sidebar.markdown("### 🔄 Switch Session")
+    with session_col2:
+        st.markdown( """ <div style="
+                text-align:center;
+                font-size:12px;
+                color:gray;
+                margin-bottom:4px; "> New Session </div> """,
+            unsafe_allow_html=True
+    )
+        if st.button( "➕", help="Start New Session", key="new_session_btn", use_container_width=True ):
+            new_id = str(uuid.uuid4())[:8]
+            st.session_state.clear()
+            st.query_params["session_id"] = new_id
+            st.session_state.session_id = new_id
+            st.session_state.messages = []
+            rag_system.reset_memory()
+            st.rerun()
+
+    ## Open Existing Session
+    st.sidebar.markdown("### 🔄 Open existing Session")
     # Create 3 columns: input | open | cancel Using columns to align the input and buttons perfectly
     col_input, col_go, col_x = st.columns([3, 1, 1])
     with col_input:
@@ -154,11 +177,7 @@ with st.sidebar:
             st.session_state.switch_session_input = ""
             st.query_params["session_id"] = new_session_id
             initialize_session(new_session_id)  # converted as a 
-            ##st.session_state.session_id = new_session_id
-            ##st.session_state.messages = [] # Wipes the UI chat hiostory
             rag_system.reset_memory()
-            ##st.session_state.rag = rag.MyRagSystem(new_session_id)
-            ##st.session_state.agent = AssistantAgent(st.session_state.rag)   # Re-initialize the agent with the new RAG system
             st.rerun()
         else:
             st.warning("Enter a session ID")
@@ -167,18 +186,6 @@ with st.sidebar:
         st.session_state.switch_session_input = ""
         st.rerun()
 
-    ## Start new session buttonn
-    if st.sidebar.button("🔄 Start New Session"):
-        new_id = str(uuid.uuid4())[:8]
-        st.session_state.clear()   # Optional: clear chat memory
-        st.query_params["session_id"] = new_id
-        initialize_session(new_id)
-        ##st.session_state.session_id = new_id
-        ##st.session_state.rag = rag.MyRagSystem(new_id)
-        ##st.session_state.agent = AssistantAgent(st.session_state.rag)
-        ##st.session_state.messages = [] # Wipes the UI chat hiostory
-        rag_system.reset_memory()
-        st.rerun()
 
     ## Start fresh seartch
     st.checkbox( "Fresh search (ignore previous answers)", key="fresh_search", value=True )
@@ -283,105 +290,75 @@ with st.sidebar:
             unsafe_allow_html=True
         )
     
-    # -----------------------------
-    # 👁️ View Documents (NEW)
-    # -----------------------------
-    with st.expander("👁️ View Documents", expanded=False):
-        files = [f for f in os.listdir(user_data_path) if os.path.isfile(os.path.join(user_data_path, f))]
-
-        if files:
-            for file in sorted(files):
-                ##st.markdown(f"📄 {file}")
+    # ------------------------------------
+    # 👁️ View / 🗑 Delete Documents (NEW)
+    # ------------------------------------
+    with st.expander("👁️ Documents", expanded=False):
+        files = sorted([ f for f in os.listdir(user_data_path) if os.path.isfile(os.path.join(user_data_path, f)) ])
+        if not files:
+            st.info("No documents uploaded.")
+        else:
+            # Init confirmation state
+            if "confirm_delete_file" not in st.session_state:
+                st.session_state.confirm_delete_file = None
+            for i, file in enumerate(files):
+                file_path = os.path.join(user_data_path, file)
+                # -----------------------------
+                # File Icon
+                # -----------------------------
                 if file.endswith(".pdf"):
                     iconx = "📕"
                 elif file.endswith(".docx"):
                     iconx = "📘"
                 elif file.endswith(".xlsx"):
                     iconx = "📊"
-                elif file.endswith(".png") or file.endswith(".jpg") or file.endswith(".jpeg"):
+                elif file.endswith((".png", ".jpg", ".jpeg")):
                     iconx = "🖼️"
                 else:
                     iconx = "📄"
-                short_name = file if len(file) < 33 else file[:30] + "..."
-                st.markdown(f"{iconx} **{short_name}**")
-        else:
-            st.info("No documents uploaded.")
-
-    ## ----------------------
-    ## Delete files section  
-    ## ----------------------  
-    # Get list of files currently in the 'data' folder
-    if "show_delete_panel" not in st.session_state:  # Init state
-        st.session_state.show_delete_panel = False
-    
-    if "pending_delete" not in st.session_state:     # Init state
-        st.session_state.pending_delete = None
-    
-    # 🔘 Show ONLY when panel is closed
-    if not st.session_state.show_delete_panel:
-        if st.button("🗑️ Delete a file", key="open_delete_panel"):
-            st.session_state.show_delete_panel = True
-
-    # 📂 Delete panel
-    if st.session_state.show_delete_panel:
-         # 🔝 Top close button
-        if st.button("❌ Close Delete Panel", key="close_top"):
-            st.session_state.show_delete_panel = False
-            st.rerun()
-
-        st.markdown("### 📂 Select a file to delete") 
-        files = [f for f in os.listdir(user_data_path) if os.path.isfile(os.path.join(user_data_path, f))]
-        if files:
-            if "confirm_delete_file" not in st.session_state:
-                st.session_state.confirm_delete_file = None
-            files = [f for f in os.listdir(user_data_path) if os.path.isfile(os.path.join(user_data_path, f))]
-            for i, file in enumerate(files):
-                file_path = os.path.join(user_data_path, file)
-                # 🔹 Disable other delete buttons if one file is being confirmed
-                disabled = ( st.session_state.confirm_delete_file is not None and st.session_state.confirm_delete_file != file )
-                col1, col2, col3 = st.columns([5, 1, 3]) 
-                # 📄 File name
+                short_name = file if len(file) < 35 else file[:32] + "..."
+                # -----------------------------
+                # Layout
+                # -----------------------------
+                col1, col2, col3 = st.columns([7, 0.6, 1.4])
+                # File name
                 with col1:
-                    if st.session_state.confirm_delete_file == file:
-                        st.warning(f"⚠️ Confirm delete:\n {file}")  # 🔹 Highlight selected file
-                    else:
-                        if file.endswith(".pdf"):    
-                             iconx = "📕"
-                        elif file.endswith(".docx"):
-                            iconx = "📘"
-                        elif file.endswith(".xlsx"):
-                            iconx = "📊"
-                        elif file.endswith(".png") or file.endswith(".jpg") or file.endswith(".jpeg"):
-                            iconx = "🖼️"
-                        else:
-                            iconx = "📄"
-                        short_name = file if len(file) < 33 else file[:30] + "..."
-                        st.markdown(f"{iconx} **{short_name}**")
-                # 🗑️ Delete button
+                    st.markdown( f"""
+                        <div style=" padding-top: 8px; padding-bottom: 4px; font-size: 15px; overflow-wrap: anywhere; ">
+                            {iconx} <b>{short_name}</b>
+                        </div> """,
+                        unsafe_allow_html=True )
+                # Delete button
                 with col2:
-                    if st.button("🗑️", key=f"delete_{i}", help="Delete this file"):
+                    disabled = ( st.session_state.confirm_delete_file is not None and st.session_state.confirm_delete_file != file )
+                    st.markdown(""" <style>
+                        div[data-testid="stButton"] button[kind="secondary"] 
+                            { padding: 0.15rem 0.35rem;
+                            min-height: 28px;
+                            font-size: 12px; }
+                        </style> """,
+                        unsafe_allow_html=True )  
+                    if st.button( "🗑", key=f"delete_{i}", disabled=disabled, help=f"Delete {file}" ):
                         st.session_state.confirm_delete_file = file
-                # ⚠️ Inline confirmation
+                # Confirmation buttons
                 with col3:
+                    st.markdown(""" <style>
+                                div[data-testid="stButton"] button  padding: 0.12rem 0.30rem; min-height: 26px; font-size: 11px;
+                                    border-radius: 6px; }
+                                </style> """, 
+                                unsafe_allow_html=True)                    
                     if st.session_state.confirm_delete_file == file:
-                        col_confirm, col_cancel = st.columns(2)
-                        with col_confirm:
-                            if st.button("✅", key=f"confirm_{i}", help="Confirm deletion of this file"):
+                        confirm_col, cancel_col = st.columns([1, 1])
+                        with confirm_col:
+                            if st.button("✔", key=f"confirm_{i}", help="Confirm delete"):
                                 rag_system.delete_single_file(file)
-                                st.toast(f"{file} deleted", icon="🗑️")  # 🔹 Toast notification (modern UX)
+                                st.toast( f"{file} deleted", icon="🗑" )
                                 st.session_state.confirm_delete_file = None
-                                st.success(f"{file} deleted")
                                 st.rerun()
-                        with col_cancel:
-                            if st.button("❌", key=f"cancel_{i}", help="Cancel deletion"):
+                        with cancel_col:
+                            if st.button("✖", key=f"cancel_{i}", help="Cancel delete"):
                                 st.session_state.confirm_delete_file = None
-        else:
-            st.info("No documents available.")
-    
-        if st.button("❌ Close Delete Panel", key="close_bottom"):  
-            st.session_state.show_delete_panel = False
-            st.rerun()
-     
+                                st.rerun()
     ## ----------------------   
 
     # -----------------------------    
@@ -491,7 +468,7 @@ for key in st.session_state:              # 3️⃣ 🔁 Re-render stored result
                         st.divider()
 
 
-if prompt := st.chat_input("Ask something about your documents"):
+if prompt := st.chat_input("Ask something about your uploaded documents or FAQs..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)

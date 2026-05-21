@@ -1,3 +1,9 @@
 [ { "question": "How to use the assistant?", 
-"answer": "Upload your documents (max 15 each time) then ask questions about them", "category": "Rag usage" }, 
-{ "question": "What is the purpose of the Fresh search button?", "answer": "Use it if you want to start a new different question not related to previous findings.", "category": " Rag usage " } ]
+"answer": "To use the assistant effectively, upload relevant documents (max 15 each time) you want to work with. Simply input your query and the assistant will provide detailed, context-based responses tailored to your needs. Suppose that you have several Job Descriptions saved as PDFs and/or Word docs and you want to find out what JDs you have from company ‘abc’ and looking for role xyz.", "category": "Rag usage" }, 
+{ "question": "What is the purpose of the Open existing Session button?", 
+"answer": "To work with a set of documents you already uploaded before. There are some limitations regarding time retention (about two days)", "category": " Rag usage " },   
+{ "question": "What is the purpose of the Fresh search button?", 
+"answer": "Use it if you want to start a new different question not related to previous findings.", "category": " Rag usage " }, 
+{ "question": "What is the purpose of the New Session (+) button?", 
+"answer": "Use it if you want to start a new session from scratch.", "category": " Rag usage " } ]   
+           

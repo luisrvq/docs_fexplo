@@ -50,7 +50,7 @@ MODEL_IMAGING    = os.getenv( "OPENAI_MODEL_IMAGING", "gpt-4.1-mini" )  # Model 
 
 Settings.llm = OpenAI(model=MODEL_REASONING)
 Settings.embed_model = OpenAIEmbedding(model=MODEL_EMBEDDINGS)
-Settings.text_splitter = SentenceSplitter( chunk_size=300, chunk_overlap=40 )
+Settings.text_splitter = SentenceSplitter( chunk_size=700, chunk_overlap=80 )
 
 class MyRagSystem:
     def __init__(self, session_id: str):
@@ -170,23 +170,44 @@ class MyRagSystem:
             print("Spreadsheet filter activated")
 
         # 2. Define the Base Retriever (Dynamic Retrieval Strategy)
-        if query_type == "retrieval_list":         top_k = 20
-        elif query_type == "comparison":           top_k = 12
-        elif query_type == "summary":              top_k = 8
-        elif query_type == "image_query":          top_k = 6
-        else:                                      top_k = 10
+        if query_type == "retrieval_list":         
+            top_k = 40
+            top_n = 20
+            effective_min_score = min(min_score, 0.10)
+        elif query_type == "comparison":           
+            top_k = 12
+            top_n = 8
+            effective_min_score = min_score
+        elif query_type == "summary":              
+            top_k = 10
+            top_n = 5
+            effective_min_score = min_score
+        elif query_type == "image_query":          
+            top_k = 6
+            top_n = 3
+            effective_min_score = min_score
+        else:                                      
+            top_k = 12
+            top_n = 5
+            effective_min_score = min_score
+        print("\n===== RETRIEVAL CONFIG =====")
+        print(f"Query Type: {query_type}")
+        print(f"top_k: {top_k}")
+        print(f"top_n: {top_n}")
+        print(f"min_score: {effective_min_score}")
+        
         base_retriever = self.index.as_retriever(similarity_top_k=top_k, filters=metadata_filters)
         print(type(metadata_filters))
         print(metadata_filters)
         print(f"Using top_k = {top_k}")
 
         # 3. Prepare Post-Processors (Filters + Reranker)
-        postprocessors = [SimilarityPostprocessor(similarity_cutoff=min_score)]
+        postprocessors = [SimilarityPostprocessor(similarity_cutoff=effective_min_score)]
         # Keyword Filter logic remains manual because it depends on user input strings
         # We will apply it to the final response nodes below.
     
         # LLM Reranker (Top 5)
-        reranker = RankGPTRerank(llm=OpenAI(model=MODEL_RETRIEVAL), top_n=5)
+        reranker = RankGPTRerank(llm=OpenAI(model=MODEL_RETRIEVAL), top_n=top_n)
         postprocessors.append(reranker)
 
         # 4. Build the Query Engine (Fixed Initialization)
@@ -202,7 +223,7 @@ class MyRagSystem:
         final_nodes = response.source_nodes[:10]  # Extract only the 3 top documents
         # 8. Temporary for debugging: print out the retrieved nodes and their metadata to verify what's being processed
         print("\n===== RETRIEVED NODES =====")
-        for i, n in enumerate(response.source_nodes[:5]): # Print top 5 for debugging
+        for i, n in enumerate(response.source_nodes[:top_n]): # Print top_n for debugging
             print(f"\nNODE {i}")
             print(f"Score: {n.score}")
             print(f"Metadata: {n.node.metadata}")
@@ -483,5 +504,4 @@ class MyRagSystem:
         return {
             "operator": operator,
             "value": value }
-
 ## --------------------------- 000000000 --------------------------- ##
