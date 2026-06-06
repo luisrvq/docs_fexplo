@@ -1,6 +1,7 @@
 # rag_pipelineg.py
 #-----------------
 import re
+import json
 import numpy
 from csv import excel
 from importlib.resources import path
@@ -79,6 +80,7 @@ class MyRagSystem:
         # Index
         if self.collection.count() > 0:
             self.index = VectorStoreIndex.from_vector_store(self.vector_store)
+            self.reload_spreadsheet_store()  # Load spreadsheets into memory on initialization
         else:
             self.index = VectorStoreIndex.from_documents([], storage_context=self.storage_context)
 
@@ -102,63 +104,14 @@ class MyRagSystem:
         return response.output_text
 
     # -----------------------------
-    # Query Classification
-    # -----------------------------    
-    def classify_query(self, question: str):
-        q = question.lower()
-        # LIST / FIND DOCUMENT
-        if any(x in q for x in ["list", "which documents", "find documents", "show documents", "documents contain",
-                                "documents mention", "what documents", "make a bullet list"]):
-            return "retrieval_list"
-        elif any(x in q for x in ["compare", "difference", "versus", "vs", "compare and contrast", "similarities", "differences"]):  
-            return "comparison"
-        elif any(x in q for x in ["summarize", "summary", "overview" ]):
-            return "summary"
-        elif any(x in q for x in ["image", "picture", "photo", "diagram", "visual"]):
-            return "image_query"
-        # DEFAULT
-        return "conversational"
-
-    # -------------------------------------------
-    # Define Prompt Templates for each query type
-    # -------------------------------------------  
-    def define_prompt(self, query_type: str):
-        if query_type == "retrieval_list":
-            system_prompt = """You are a document retrieval assistant.
-                                Return ONLY the matching document names.
-                                Use concise bullet points.
-                                Do not invent documents.
-                                Only mention documents present in the retrieved context.  """
-
-        elif query_type == "comparison":
-            system_prompt = """You are a comparison assistant.
-                               Compare the retrieved documents clearly.
-                               Highlight similarities and differences. """
-
-        elif query_type == "summary":
-            system_prompt = """You are a summarization assistant.
-                                Create concise summaries from the retrieved content."""
-        elif query_type == "image_query":
-            system_prompt = """You are an image analysis assistant.
-                                Focus on visual content extracted from images."""
-        else:
-            system_prompt = """You are a helpful assistant.
-                            Use the provided context to answer accurately."""
-        return system_prompt
-
-    # -----------------------------
     # ASK
     # -----------------------------
-    def ask(self, question, required_words="", mode="Match All", min_score=0.15):
+    def ask(self, question, required_words="", mode="Match All", min_score=0.15, query_type=None):
         from llama_index.core.query_engine import RetrieverQueryEngine
         from llama_index.core.chat_engine import CondensePlusContextChatEngine
         from llama_index.core.postprocessor import SimilarityPostprocessor
         from llama_index.postprocessor.rankgpt_rerank import RankGPTRerank
-        from llama_index.llms.openai import OpenAI  
-
-        # Detect Query Type
-        query_type = self.classify_query(question)
-        print(f"Detected query type: {query_type}")  
+        from llama_index.llms.openai import OpenAI   
 
         metadata_filters = None
         if "faq" not in question.lower():
@@ -171,8 +124,8 @@ class MyRagSystem:
 
         # 2. Define the Base Retriever (Dynamic Retrieval Strategy)
         if query_type == "retrieval_list":         
-            top_k = 40
-            top_n = 20
+            top_k = 12
+            top_n = 5
             effective_min_score = min(min_score, 0.10)
         elif query_type == "comparison":           
             top_k = 12
@@ -227,7 +180,7 @@ class MyRagSystem:
             print(f"\nNODE {i}")
             print(f"Score: {n.score}")
             print(f"Metadata: {n.node.metadata}")
-            print(n.node.get_content()[:500])
+            print(n.node.get_content()[:50])
 
         snippets = []
         sources = []
@@ -450,58 +403,245 @@ class MyRagSystem:
         except Exception as e:
             print(f"Spreadsheet store failed: {e}")
             raise
+    # ------------------------------------------------------------------------------------
+    # ReLoad Excel/CSV into self.spreadsheets WITHOUT indexing (for spreadsheet_search tool)
+    # ------------------------------------------------------------------------------------
+    def reload_spreadsheet_store(self):
+        self.spreadsheets = {}
+        self.spreadsheet_schema = {}
+        upload_dir = self.data_path
+        for filename in os.listdir(upload_dir):
+            if filename.lower().endswith((".xlsx", ".xls", ".csv")):
+                path = os.path.join(upload_dir, filename)
+                self.load_spreadsheet_store(path, filename)
 
-    # --------------------------------------------------------------------------------
-    # Search Excel files (searching within the content of the sheets, not just titles)
-    # --------------------------------------------------------------------------------
-    def search_spreadsheets( self, query, max_rows=20 ):
-        query_lower = query.lower()
-        results = []
-        for file_name, df in self.spreadsheets.items():
+    # -----------------------------------------------------------------------------------------------------------
+    # New Parser with LLM. It will convert the user query into a structured JSON format that specifies 
+    # which columns to filter on, what operators to use, and what values to compare against. 
+    # This structured format can then be used by your spreadsheet_search tool to perform the actual data retrieval 
+    # from the loaded spreadsheets.   
+    # ------------------------------------------------------------------------------------------------------------
+    def parse_query_with_llm(self, query: str, available_columns: list):
+
+        prompt = f"""
+    You are an expert spreadsheet query parser.
+
+    Available columns:
+    {available_columns}
+
+    Convert the user request into JSON.
+
+    Return ONLY valid JSON.
+
+    Do NOT use markdown.
+    Do NOT use ```json.
+    Do NOT provide explanations.
+
+    Schema:
+    {{
+    "query_type": 
+        "spreadsheet|document_search|document_list|general",
+    "filters": [
+        {{
+        "column": "column name",
+        "operator": ">|<|>=|<=|=|contains",
+        "value": "value"
+        }} ],
+
+    "columns": ["column1", "column2" ],
+
+    "sort": {{"column": "column name", "direction": "asc|desc" }},
+      
+    "search_terms": ["term1", "term2"] 
+    }}
+
+    Determine the query type.
+
+    Use:
+
+    spreadsheet:
+    - apartments
+    - apartment listings
+    - property listings
+    - excel
+    - csv
+    - rows
+    - columns
+    - table data
+    - filtering spreadsheet data
+
+    document_list:
+    - list document titles
+    - list filenames
+    - uploaded files
+    - show documents
+    - what documents do I have
+
+    document_search:
+    - find documents mentioning
+    - search resumes
+    - search job descriptions
+    - search uploaded documents
+
+    general:
+    - conversational questions
+    - explanations
+    - advice
+
+    For numeric values return numbers without quotes.
+    GOOD: "value": 81
+    BAD: "value": "81"
+    Return ONLY valid JSON.
+
+    For ranges:
+    Examples:
+    "area between 80 and 120 m2"
+    Return:
+    "column": "Area (M2)",
+    "operator": "between",
+    "value": [80,120]
+
+    "price between 900000 and 1200000"
+    Return:
+    "column": "List Price",
+    "operator": "between",
+    "value": [900000,1200000]
+
+    For sorting:
+    Examples:
+    "cheapest apartments"
+    Return:
+    "sort": 
+        "column":"List Price",
+        "direction":"asc"
+
+    "most expensive apartments"
+    Return:
+    "sort": 
+        "column":"List Price",
+        "direction":"desc"
+
+    "newest apartments"
+    Return:
+    "sort": 
+        "column":"Year",
+        "direction":"desc"
+
+    "oldest apartments"
+    Return:
+    "sort":
+        "column":"Year",
+        "direction":"asc"
+   
+
+    User request:
+    {query}
+    """
+
+        llm = OpenAI(model=MODEL_REASONING)
+
+        response = llm.complete(prompt)
+
+        try:
+            response_text = response.text.strip()
+            if response_text.startswith("```json"):
+                response_text = response_text.replace("```json", "", 1)
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()    
+            return json.loads(response_text)
+       
+        except Exception as e:
+            print("JSON Parse Error:", e)
+            print(response)
+            return {
+                "query_type": "general",
+                "filters": [],
+                "columns": [],
+                "sort": { },
+                "search_terms": []
+            }  
+        
+    # ----------------------------------------------------------------------------------------------
+    # This tool function will decide what to filter based on the JSON Parser. 
+    # Apply LLM-generated filters to a dataframe 
+    # ----------------------------------------------------------------------------------------------  
+    def apply_dataframe_filters(self, df, filters):
+        """
+        Apply LLM-generated filters to a dataframe.
+        Supported operators:
+        =, contains, >, <, >=, <=, between
+        """
+
+        working_df = df.copy()
+
+        for f in filters:
 
             try:
-                # Convert dataframe to string temporarily
-                mask = df.astype(str).apply( lambda col: col.str.lower().str.contains(query_lower, na=False ) )
-                matched_rows = df[mask.any(axis=1)]
-                if not matched_rows.empty:
-                    results.append({"file": file_name, "rows": matched_rows.head(max_rows) })
+                column = f.get("column")
+                operator = f.get("operator")
+                value = f.get("value")
+
+                if column not in working_df.columns:
+                    print(f"Column not found: {column}")
+                    continue
+
+                if operator in [">", "<", ">=", "<=", "between"]:     # Numeric operators
+                    numeric_series = pd.to_numeric(working_df[column],  errors="coerce" )
+                    if operator == ">":
+                        working_df = working_df[numeric_series > float(value)]
+                    elif operator == "<":
+                        working_df = working_df[numeric_series < float(value)]
+                    elif operator == ">=":
+                        working_df = working_df[numeric_series >= float(value)]
+                    elif operator == "<=":
+                        working_df = working_df[numeric_series <= float(value)]
+                    elif operator == "between":
+                        low, high = value
+                        working_df = working_df[ numeric_series.between( float(low), float(high) ) ]
+
+                elif operator == "=":                     # Exact Match
+                    working_df = working_df[ working_df[column].astype(str).str.lower() == str(value).lower() ]
+                
+                elif operator == "contains":              # Contains
+                    working_df = working_df[ working_df[column].astype(str).str.contains(str(value), case=False, na=False ) ]
+
+                elif operator == "between":               # Between (for numeric ranges)
+                        if ( isinstance(value, list) and len(value) == 2 ):
+                            low, high = value
+                            working_df = working_df[numeric_series.between( float(low), float(high) ) ]
+
             except Exception as e:
-                print(f"Spreadsheet search error in {file_name}: {e}")
+                print(f"Filter error: {e}")
+                print( f"Filter failed "  f"{column} {operator} {value}" )
+                continue
 
-        self.last_spreadsheet_results = results
+        return working_df
+    
+    # ----------------------------------------------------------------------------------------------
+    # This tool function will sort the dataframe 
+    # Apply LLM-generated filters to a dataframe 
+    # ----------------------------------------------------------------------------------------------  
+    def apply_sorting( self, df, sort_config):
 
-        if not results:
-            return "No spreadsheet matches found."
+        if not sort_config:
+            return df
 
-        final_output = []
-        for r in results:
-            final_output.append( f"\n📄 FILE: {r['file']}\n" )
-            final_output.append( r["rows"].to_string(index=False) )
+        column = sort_config.get("column")
+        direction = sort_config.get("direction", "asc")
+        if column not in df.columns:
+            print( f"Sort column not found: {column}" )
+            return df
+        ascending = ( direction.lower() == "asc" )
 
-        return "\n\n".join(final_output)
+        return df.sort_values( by=column, ascending=ascending )
 
     # ----------------------------------------------------------------------------------------------
-    # This tool function the Agent will call when it wants to search numbers inside XLS or CSV files. 
-    # It includes keyword filtering and dynamic retrieval strategies based on query type.   
+    # Column Selection Helper 
     # ----------------------------------------------------------------------------------------------  
-    def parse_numeric_query(self, query):
-        query_lower = query.lower()
-        operator = None
-        if "above" in query_lower or "greater than" in query_lower:
-            operator = "gt"
-        elif "below" in query_lower or "less than" in query_lower:
-            operator = "lt"
-        numbers = re.findall(r'\\d+(?:\\.\\d+)?', query_lower)     # Extract numbers
-        if not numbers:
-            return None
-        value = float(numbers[0])
-        # Human normalization
-        if "million" in query_lower:
-            value *= 1_000_000
-        elif "k" in query_lower:
-            value *= 1_000
-
-        return {
-            "operator": operator,
-            "value": value }
+    def select_columns(self, df, columns):
+        if not columns:
+            return df
+        valid_cols = [c for c in columns if c in df.columns ]
+        return df[valid_cols]
 ## --------------------------- 000000000 --------------------------- ##
