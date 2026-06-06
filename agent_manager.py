@@ -2,6 +2,7 @@
 #-----------------
 
 import pandas as pd
+import re
 from llama_index.core.agent import ReActAgent
 from llama_index.core.tools import FunctionTool
 from llama_index.llms.openai import OpenAI
@@ -15,7 +16,8 @@ class AssistantAgent:
         from rag_pipelineg import MyRagSystem   # Import my existing class
         # 1. Initialize your existing stable RAG
         self.rag_system = rag_instance  # Use the existing RAG instance passed from Streamlit session state
-        
+
+        #---------------------------------------------------------------------------------------------------
         # Define the function that will be wrapped as a tool for the Agent. 
         # This function will call your RAG's ask() method.
         #------------------------------------------------------------------ 
@@ -26,14 +28,14 @@ class AssistantAgent:
                 query, 
                 required_words=st.session_state.get("keyword_filter_key", ""),
                 mode=st.session_state.get("logic_mode_key", "Match All"),
-                min_score=st.session_state.get("min_score_key", 0.15),  )
+                min_score=st.session_state.get("min_score_key", 0.15), query_type=None  )
 
             self.rag_system.last_sources = sources   # Store sources for UI
             self.rag_system.last_snippets = snippets
-            print("TOOL USED: document_search")
+            print("TOOL USED: document_search. This is deactivating the Agent's ability to call the RAG directly, but you can re-enable if you want the Agent to have more autonomy in deciding when to search documents.")
             return answer   # Return ONLY text to the Agent
         
-
+        #---------------------------------------------------------------------------------------------------
         # This is a separate tool that ONLY searches document titles and filenames, 
         # which can be useful for certain queries that reference file names or ask "What documents do I have
         #---------------------------------------------------------------------------------------------------
@@ -45,60 +47,43 @@ class AssistantAgent:
                                                         min_score=st.session_state.get( "min_score_key", 0.15 ) )
             print("TOOL USED: document_catalog_search")
             return result
-        
-        # This is another separate tool that ONLY searches inside spreadsheets, 
-        # which can be useful for queries that specifically reference tables, Excel files, or CSVs.
-        def spreadsheet_tool_fn(query, max_rows=20):
+        #----------------------------------------------------------------------------------------
+        # Use LLM to parser the prompt and extract filters and column selections, then apply to each spreadsheet.
+        #----------------------------------------------------------------------------------
+        def spreadsheet_tool_fn(query, max_rows=30, parsed_query=None):
             query_lower = query.lower()
             results = []
-            numeric_filter = self.rag_system.parse_numeric_query(query)
+
+            # 3. Loop through spreadsheets
+            #-----------------------------
             for file_name, df in self.rag_system.spreadsheets.items():
-                try:
-                    working_df = df.copy()
-                    # NUMERIC FILTERING
-                    # ----------------------------
-                    if numeric_filter:
-                        # Detect likely price columns
-                        price_columns = [
-                            c for c in working_df.columns
-                            if any(keyword in str(c).lower() for keyword in [ "price", "value", "amount", "cost" ]) ]
-                        for col in price_columns:
-                            try:
-                                numeric_series = pd.to_numeric( working_df[col], errors="coerce" )
-                                if numeric_filter["operator"] == "gt":
-                                    filtered_df = working_df[ numeric_series > numeric_filter["value"] ]
-                                elif numeric_filter["operator"] == "lt":
-                                    filtered_df = working_df[ numeric_series < numeric_filter["value"] ]
-                                else:
-                                    continue
+                print(f"Processing spreadsheet: {file_name}")  # Debug print to check which file is being processed
+                working_df = df.copy()  
 
-                                if not filtered_df.empty:
-                                    results.append({ "file": file_name, "rows": filtered_df.head(max_rows)  })
+                # parse prompt using LLM to extract filters and column selections, then apply to each spreadsheet
+                #------------------------------------------------------------------------------------------------
+                #parsed_query = self.rag_system.parse_query_with_llm( query, list(working_df.columns) )  
+                print( f"LLM-parsed query structure: {parsed_query}" )  # Debug print to check LLM parsing output
 
-                            except Exception as e:
-                                print(f"Numeric filter failed for column {col}: {e}")
+                working_df = (self.rag_system.apply_dataframe_filters( working_df, parsed_query["filters"] ) )
 
-                    # TEXT FILTERING
-                    # ----------------------------
-                    else:
-                        mask = working_df.astype(str).apply(
-                            lambda col: col.str.lower().str.contains( query_lower, na=False ) )
-                        matched_rows = working_df[mask.any(axis=1)]
-                        if not matched_rows.empty:
-                            results.append({ "file": file_name, "rows": matched_rows.head(max_rows) })
-                except Exception as e:
-                    print(f"Spreadsheet search error in {file_name}: {e}")
+                working_df = ( self.rag_system.apply_sorting( working_df, parsed_query.get("sort", {} ) ) )
+                print( "\n===== SORT =====" )
+                print( parsed_query.get( "sort", {} ) )
+                print( "================\n")
+                
+                working_df = (self.rag_system.select_columns( working_df, parsed_query["columns"] ) )
 
-            ##self.last_spreadsheet_results = results
-            if not results:
-                return "No spreadsheet matches found."
-            final_output = []
-            for r in results:
-                final_output.append( f"\\n📄 FILE: {r['file']}\\n" )
-                final_output.append( r["rows"].to_string(index=False) )
+                # Append results
+                # -----------------------------------------
+                if not working_df.empty:
+                    results.append({"file": file_name,
+                                    "rows": working_df.head(max_rows) }) 
+                    return results
+                else:   
+                    return "No spreadsheet matches found."
 
-            return "\\n\\n".join(final_output)
-        
+        #----------------------------------------------------------------
         # 2a. Define the RAG as a Tool
         # This tells the Agent: "If you need facts from docs, call this."
         #----------------------------------------------------------------
@@ -180,6 +165,7 @@ class AssistantAgent:
             - find records
             - summarize spreadsheet data
             - locate spreadsheet values
+            - make calculations with spreadsheet data
 
             IMPORTANT:
             This tool works specifically with structured spreadsheet data.
@@ -196,27 +182,67 @@ class AssistantAgent:
             memory=self.rag_system.memory,
             verbose=True  )
 
+    #-----------------------------------------------------------------------------------------------------------
+    # handle_query optimized to use LLM parsing to detect numeric/spreadsheet intent and relevant Excel data 
+    # before routing to the Agent,
+    #-----------------------------------------------------------------------------------------------------------
     def handle_query(self, user_input):
-        try:
-            # This is the single entry point for your Streamlit UI
-            response = self.agent.chat(user_input)
-            output_text = response.response
-        except Exception as e:
-            # 🛡️ Fallback: If gpt-3.5 reasoning layer fails, bypass agent 
-            # and query your stable RAG directly so the user gets an answer!
-            print(f"Agent Reasoning Loop Failed: {str(e)}. Routing to direct RAG.")
-            output_text, _, _ = self.rag_system.ask(
-                user_input,
-                required_words=st.session_state.get("keyword_filter_key", ""),
-                mode=st.session_state.get("logic_mode_key", "Match All"),
-                min_score=st.session_state.get("min_score", 0.15) )
-                #reset_memory=False  )
+        # No spreadsheets loaded?
 
-        # Access the RAG's metadata for your UI sources
-        # (This pulls from the tool's execution history)
-        sources = getattr(self.rag_system, 'last_sources', []) 
-        snippets = getattr(self.rag_system, 'last_snippets', [])
-        
-        #return response.response, sources, snippets
-        return output_text, sources, snippets
+        available_columns = []
+        if self.rag_system.spreadsheets:
+            first_df = next( iter(self.rag_system.spreadsheets.values()) )
+            available_columns = list( first_df.columns )
+
+        parsed = self.rag_system.parse_query_with_llm( user_input, available_columns )
+
+        print("\n===== PARSED QUERY =====")
+        print(parsed)
+        print("========================\n")
+
+        query_type = parsed.get( "query_type", "general" )
+
+        # Spreadsheet route
+        #------------------
+        if query_type == "spreadsheet":
+            print( "🔧 Routing to spreadsheet_search" )
+            try:
+                results = self.spreadsheet_tool.fn( user_input, parsed_query=parsed )
+                return results, [], []
+            except Exception as e:
+                print(  f"Spreadsheet tool failed: {e}"  )
+                return ( "Spreadsheet search failed.", [], []  )        
+        elif query_type == "document_list":
+            print( "📄 Routing to catalog_tool" )
+            result = self.catalog_tool.fn( user_input )
+            return result, [], []
+        elif query_type == "document_search":
+            print( "📚 Routing to RAG" )
+            return self.rag_system.ask(
+                user_input,
+                required_words=st.session_state.get(
+                    "keyword_filter_key",
+                    "" ),
+                mode=st.session_state.get(
+                    "logic_mode_key",
+                    "Match All" ),
+                min_score=st.session_state.get(
+                    "min_score_key",
+                    0.15 ),
+                query_type=query_type  )
+        else:
+            print( "💬 Routing to general RAG"  )
+            return self.rag_system.ask(
+                user_input,
+                required_words=st.session_state.get(
+                    "keyword_filter_key",
+                    ""  ),
+                mode=st.session_state.get(
+                    "logic_mode_key",
+                    "Match All"  ),
+                min_score=st.session_state.get(
+                    "min_score_key",
+                    0.15  ), 
+                query_type=query_type  )
+
 ## --------------------------- 00 --------------------------- ##

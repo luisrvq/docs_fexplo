@@ -1,3 +1,5 @@
+# maing.py
+#---------
 import streamlit as st
 import rag_pipelineg as rag  # Import as 'rag' to avoid name collisions
 import os
@@ -177,7 +179,8 @@ with st.sidebar:
             st.session_state.switch_session_input = ""
             st.query_params["session_id"] = new_session_id
             initialize_session(new_session_id)  # converted as a 
-            rag_system.reset_memory()
+            st.session_state.rag.reset_memory()
+            st.session_state.rag.reload_spreadsheet_store()  # NEW: Reload spreadsheet data for the new session
             st.rerun()
         else:
             st.warning("Enter a session ID")
@@ -476,15 +479,21 @@ if prompt := st.chat_input("Ask something about your uploaded documents or FAQs.
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
 
-            ## answer, sources, snippets = rag_system.ask( prompt, required_words=keywordsx, 
-            ##                                           mode=match_mode, min_score=min_score, reset_memory = fresh_search )
             # NEW: use the Agent manager to handle the query and get the response + sources
+            # This method will internally call the RAG system, apply any necessary logic, 
+            # and return the final answer along with the sources and snippets.
             answer, sources, snippets = assistant_agent.handle_query(prompt) 
+            print(f"After handle_query - Answer: {answer}")
+            print(f"After handle_query - Sources: {sources}")
             
-            if sources:
-                st.session_state["last_source"] = sources[0][0]  # NEW: store top document
-
-            st.markdown(answer)
+            if isinstance(answer, list):    # If spreadsheet results (list of dicts)
+                for r in answer: 
+                    st.markdown(f"### 📄 {r['file']}")
+                    st.dataframe(r["rows"])
+            else:
+                st.markdown(answer)
+            ##st.markdown(answer)
+            
         # 2. Retrieve the data from session state
         # Show sources + snippets
         if sources:
@@ -504,5 +513,6 @@ if prompt := st.chat_input("Ask something about your uploaded documents or FAQs.
                         render_file_action( file_name=item["file"], full_path=full_path, key=f"new_{j}" )
                     
                         st.divider() # Optional: adds a small line between different sources
+
     st.session_state.messages.append({ "role": "assistant", "content": answer, "sources": sources, "snippets": snippets })
 ## --------------------------- 00 --------------------------- ##
